@@ -8,28 +8,6 @@ pd.set_option('max_colwidth', 5000)
 plt.rcParams['figure.figsize'] = (12, 8)
 
 
-
-
-#################################################################################
-#####                               CLASSIFIERS                             #####
-#################################################################################
-
-### Logistic Regression
-class logreg:
-    def __init__(self):
-
-    def fit(X, y):
-
-    def predict(X):
-
-### Naive Bayes
-class NB:
-    def __init__(self):
-
-    def fit(X, y):
-
-    def predict(X):
-
 #################################################################################
 #####                            PRE-PROCESSING                             #####
 #################################################################################
@@ -60,7 +38,7 @@ def correlation(dataset, threshold):
 
     # print(dataset)
 
-
+#### DATASET 1 #### 
 # Predict whether radar result is "good"/"bad" dataset
 ionosphere_2020 = pd.read_csv('ionosphere.csv')
 ionosphere_2020.columns = ['Feature 1', 'Feature 2', 'Feature 3', 'Feature 4', 'Feature 5', 'Feature 6', 'Feature 7',
@@ -79,6 +57,7 @@ correlation(ionosphere_2020, 0.98)
 # print(null_counts2)
 
 
+#### DATASET 2 ####
 # Predict salary based on attributes dataset
 
 adult_2020 = pd.read_csv('adult.csv', skipinitialspace=True)
@@ -99,6 +78,8 @@ adult_2020 = one_hot_encode(adult_2020, 'Salary')
 # null_counts = adult_2020.isnull().sum()
 # print(null_counts)
 
+
+#### DATASET3 ####
 abalone_2020 = pd.read_csv('abalone.csv')
 abalone_2020.columns = ['Sex', 'Length', 'Diameter', 'Height', 'Whole Weight', 'Shucked Weight', 'Viscera Weight',
                         'Shell Weight', 'Rings']
@@ -107,6 +88,7 @@ a_null = abalone_2020.isnull().sum()
 # correlation(abalone_2020, 0.9)
 abalone_2020 = one_hot_encode(abalone_2020, 'Sex')
 
+#### DATASET 4 ####
 iris_2020 = pd.read_csv('iris.csv')
 iris_2020.columns = ['Sepal length', 'Sepal Width', 'Petal length', 'Petal width', 'Class']
 iris_2020 = iris_2020.replace('?', np.nan)
@@ -117,6 +99,77 @@ adult_array = adult_2020.to_numpy()
 ionosphere_array = ionosphere_2020.to_numpy()
 abalone_array = abalone_2020.to_numpy()
 iris_array = iris_2020.to_numpy()
+
+#################################################################################
+#####                               CLASSIFIERS                             #####
+#################################################################################
+
+class LogisticRegression:
+  def __init__(self, lr=0.01, epsilon=1e-2, fit_intercept=True, verbose=False):
+    self.lr = lr
+    self.epsilon = epsilon
+    self.fit_intercept = fit_intercept
+
+  def sigmoid(z):
+    h = 1 / (1 + np.exp(-z))
+    return h
+  
+  def cost(h, y):
+    J = np.mean((-y * np.log(h) - (1-y) * np.log(1 - h)))
+    return J
+
+  def gradient(X,y,w):
+    N, D = X.shape
+    z = np.dot(X,w)
+    yh = sigmoid(z)
+    grad = np.dot(X.T, yh - y) / N
+    return grad
+  
+  def GradientDescent (X, y, lr, epsilon):
+    N,D = X.shape
+    w = np.zeros(D)
+    g = np.inf
+    while np.linalg.norm(g) > eps:
+      g = gradient(X, y,w)
+      w = w - lr*g 
+
+      z = np.dot(X,w)
+      h = sigmoid(z)
+      print(f'loss: {cost(h,y)} \t')
+
+    return w
+
+  def fit (self, X, y):
+    GradientDescent(X,y,lr,epsilon)
+
+  def predict_prob(X):
+    return sigmoid(X, self.w)
+
+  def predict(X, threshold):
+    return predict_prob(X) >= threshold
+
+
+# Gaussian Naive Bayes
+class NaiveBayes:
+  def __init__(training, test):
+    self.__training = training
+    self.__test = test
+    self.__n = len(training)
+    
+  def fit(X,y,Xtest):
+    N,C = y.shape
+    D = X.shape[1]
+    mu, s = np.zeros((C,D)), np.zeros((C,D))
+    for c in range(C):
+      inds = np.nonzero(y[:,c])[0]
+      mu[c,:] = np.std(X[inds,:],0)
+      s[c,:] = np.std(X[inds,:],0)
+    log_prior = np.log(np.mean(y,0))[:,None]
+    log_likelihood = - np.sum(np.log(s[:,None,:]) + .5*(((Xt[None,:,:] - mu[:,None,:])/s[:,None,:])**2),2)
+    return log_prior + log_likelihood
+
+   def predict(yh, y):
+   	
 
 #################################################################################
 #####                          DATASET DESCRIPTION                          #####

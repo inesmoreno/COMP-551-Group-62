@@ -229,6 +229,10 @@ def cross_validation(X, y, classifier, k=5, shuffle=False, obj=accuracy):
     total_obj += obj(tp, fp, tn, fn)
   return total_obj/k
 
+  def evaluate_acc(target_labels, true_labels):
+    tp, fp, tn, fn = count_result(target_labels, y[index[i]:index[i+1]])
+    return accuracy(tp, fp, tn, fn)
+
 
 #################################################################################
 #####                          DATASET DESCRIPTION                          #####
@@ -240,94 +244,130 @@ def cross_validation(X, y, classifier, k=5, shuffle=False, obj=accuracy):
 #####                                TRAINING                               #####
 #################################################################################
 
-dataset = ionosphere_array
-np.random.shuffle(dataset)
+def find_parameters(training_set, plot=False):
+  # Finding the best learning rate
 
-train_percent = 0.8
+  lr_lst = []
+  acc_lst = []
+  best_acc = 0
+  best_lr = 0
 
-N, D = dataset.shape
+  for i in range(50):
+    logreg = LogisticRegression(lr = 0.001 + 0.001*i)
+    acc = cross_validation(training_set[:, :-1], training_set[:, -1], logreg)
+    if acc > best_acc:
+      best_acc = acc
+      best_lr = 0.001 + 0.001*i
+    lr_lst.append(0.001 + 0.001*i)
+    acc_lst.append(acc)
 
-train_size = math.floor(N*train_percent)
-training_set = dataset[:train_size, :]
-testing_set = dataset[train_size:, :]
+  print("Best Learning Rate : ", best_lr)
 
-
-# Finding the best learning rate
-
-lr_lst = []
-acc_lst = []
-best_acc = 0
-best_lr = 0
-
-for i in range(50):
-  logreg = LogisticRegression(lr = 0.001 + 0.001*i)
-  acc = cross_validation(training_set[:, :-1], training_set[:, -1], logreg)
-  if acc > best_acc:
-    best_acc = acc
-    best_lr = 0.001 + 0.001*i
-  lr_lst.append(0.001 + 0.001*i)
-  acc_lst.append(acc)
-
-print("Best Learning Rate : ", best_lr)
-
-plt.plot(lr_lst, acc_lst)
-plt.suptitle("Accuracy in function of the learning rate")
-plt.xlabel("Learning Rate")
-plt.ylabel("Accuracy")
-plt.show()
+  if plot:
+    plt.plot(lr_lst, acc_lst)
+    plt.suptitle("Accuracy in function of the learning rate")
+    plt.xlabel("Learning Rate")
+    plt.ylabel("Accuracy")
+    plt.show()
 
 
-# Finding the best epsilon
+  # Finding the best epsilon
 
-eps_lst = []
-acc_lst = []
-best_acc = 0
-best_eps = 0
+  eps_lst = []
+  acc_lst = []
+  best_acc = 0
+  best_eps = 0
 
-for i in range(10):
-  logreg = LogisticRegression(epsilon = 0.001 + 0.001*i)
-  acc = cross_validation(training_set[:, :-1], training_set[:, -1], logreg)
-  if acc > best_acc:
-    best_acc = acc
-    best_eps = 0.001 + 0.001*i
-  eps_lst.append(0.001 + 0.001*i)
-  acc_lst.append(acc)
+  for i in range(10):
+    logreg = LogisticRegression(lr = best_lr, epsilon = 0.005 + 0.001*i)
+    acc = cross_validation(training_set[:, :-1], training_set[:, -1], logreg)
+    if acc > best_acc:
+      best_acc = acc
+      best_eps = 0.001 + 0.001*i
+    eps_lst.append(0.001 + 0.001*i)
+    acc_lst.append(acc)
 
-print("Best Epsilon : ", best_eps)
+  print("Best Epsilon : ", best_eps)
 
-plt.plot(eps_lst, acc_lst)
-plt.suptitle("Accuracy in function of the epsilon")
-plt.xlabel("Epsilon")
-plt.ylabel("Accuracy")
-plt.show()
+  if plot:
+    plt.plot(eps_lst, acc_lst)
+    plt.suptitle("Accuracy in function of the epsilon")
+    plt.xlabel("Epsilon")
+    plt.ylabel("Accuracy")
+    plt.show()
 
 
-# Finding the best number of iteration
+  # Finding the best number of iteration
 
-iter_lst = []
-acc_lst = []
-best_acc = 0
-best_iter = 0
+  iter_lst = []
+  acc_lst = []
+  best_acc = 0
+  best_iter = 0
 
-for i in range(50):
-  logreg = LogisticRegression(max_iter = 100 + 100*i)
-  acc = cross_validation(training_set[:, :-1], training_set[:, -1], logreg)
-  if acc > best_acc:
-    best_acc = acc
-    best_iter = 100 + 100*i
-  iter_lst.append(100 + 100*i)
-  acc_lst.append(acc)
+  for i in range(50):
+    logreg = LogisticRegression(lr = best_lr, epsilon = best_eps, max_iter = 100 + 100*i)
+    acc = cross_validation(training_set[:, :-1], training_set[:, -1], logreg)
+    if acc > best_acc:
+      best_acc = acc
+      best_iter = 100 + 100*i
+    iter_lst.append(100 + 100*i)
+    acc_lst.append(acc)
 
-print("Best Number of Iteration : ", best_iter)
+  print("Best Number of Iteration : ", best_iter)
 
-plt.plot(iter_lst, acc_lst)
-plt.suptitle("Accuracy in function of the number of iteration")
-plt.xlabel("Number of iteration")
-plt.ylabel("Accuracy")
-plt.show()
+  if plot:
+    plt.plot(iter_lst, acc_lst)
+    plt.suptitle("Accuracy in function of the number of iteration")
+    plt.xlabel("Number of iteration")
+    plt.ylabel("Accuracy")
+    plt.show()
+
+  return best_lr, best_eps, best_iter
 
 
 #################################################################################
 #####                             RESULT ANALYSIS                           #####
 #################################################################################
+
+def evaluate_log(dataset, train_percent=0.8, plot=False):
+  np.random.shuffle(dataset)
+  N, D = dataset.shape
+
+  train_size = math.floor(N*train_percent)
+  training_set = dataset[:train_size, :]
+  testing_set = dataset[train_size:, :]
+
+  lr, eps, iter = find_parameters(training_set, plot=plot)
+
+  logreg = LogisticRegression(lr, eps, max_iter=iter)
+  logreg.fit(training_set[:, :-1], training_set[:, -1])
+  target_labels = logreg.predict(testing_set[:, :-1], 0.5)
+  tp, fp, tn, fn = count_result(target_labels, testing_set[:, -1])
+
+  print("Accuracy : ", accuracy(tp, fp, tn, fn))
+  print("Error Rate : ", error_rate(tp, fp, tn, fn))
+  print("Precision : ", precision(tp, fp, tn, fn))
+  print("Recall : ", recall(tp, fp, tn, fn))
+  print("F1-score : ", f1score(tp, fp, tn, fn))
+
+  return accuracy(tp, fp, tn, fn)
+
+def evaluate_model(dataset):
+  perc_lst = []
+  acc_lst = []
+  for i in range(9):
+    acc = evaluate_log(dataset, train_percent = 0.1 + 0.1*i)
+    perc_lst.append(0.1 + 0.1*i)
+    acc_lst.append(acc)
+
+  plt.plot(perc_lst, acc_lst)
+  plt.suptitle("Accuracy in function of the training percentage")
+  plt.xlabel("Training Percentage")
+  plt.ylabel("Accuracy")
+  plt.show()
+
+
+
+dataset = ionosphere_array
+evaluate_model(dataset)
 

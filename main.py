@@ -71,6 +71,7 @@ adult_2020 = adult_2020.replace('?', np.nan)  # Replace the missing '?' values w
 adult_2020 = adult_2020.dropna(axis=0)
 adult_2020 = one_hot_encode(adult_2020, 'Work class')
 adult_2020 = one_hot_encode(adult_2020, 'Marital Status')
+adult_2020 = one_hot_encode(adult_2020, 'Occupation')
 adult_2020 = one_hot_encode(adult_2020, 'Relationship')
 adult_2020 = one_hot_encode(adult_2020, 'Race')
 adult_2020 = one_hot_encode(adult_2020, 'Sex')
@@ -229,9 +230,9 @@ def cross_validation(X, y, classifier, k=5, shuffle=False, obj=accuracy):
     total_obj += obj(tp, fp, tn, fn)
   return total_obj/k
 
-  def evaluate_acc(target_labels, true_labels):
-    tp, fp, tn, fn = count_result(target_labels, y[index[i]:index[i+1]])
-    return accuracy(tp, fp, tn, fn)
+def evaluate_acc(target_labels, true_labels):
+  tp, fp, tn, fn = count_result(target_labels, true_labels)
+  return accuracy(tp, fp, tn, fn)
 
 
 #################################################################################
@@ -252,7 +253,7 @@ def find_parameters(training_set, plot=False):
   best_acc = 0
   best_lr = 0
 
-  for i in range(50):
+  for i in range(20):
     logreg = LogisticRegression(lr = 0.001 + 0.001*i)
     acc = cross_validation(training_set[:, :-1], training_set[:, -1], logreg)
     if acc > best_acc:
@@ -304,8 +305,8 @@ def find_parameters(training_set, plot=False):
   best_acc = 0
   best_iter = 0
 
-  for i in range(50):
-    logreg = LogisticRegression(lr = best_lr, epsilon = best_eps, max_iter = 100 + 100*i)
+  for i in range(20):
+    logreg = LogisticRegression(lr = best_lr, epsilon = best_eps, max_iter = 200 + 200*i)
     acc = cross_validation(training_set[:, :-1], training_set[:, -1], logreg)
     if acc > best_acc:
       best_acc = acc
@@ -368,6 +369,12 @@ def evaluate_model(dataset):
 
 
 
-dataset = ionosphere_array
-evaluate_model(dataset)
+#dataset = ionosphere_array
+#dataset = adult_array
+#dataset = abalone_array
+dataset = iris_array
+
+
+evaluate_log(dataset, plot=True)
+#evaluate_model(dataset)
 

@@ -67,6 +67,7 @@ adult_2020.columns = ['Age', 'Work class', 'Final Weight', 'Education', 'Educati
                       'Salary']
 # Dropping Education feature since it is redundant when Education-Num is there
 adult_2020 = adult_2020.drop(columns=['Education'])
+adult_2020 = adult_2020.drop(columns=['Final Weight'])
 adult_2020 = adult_2020.replace('?', np.nan)  # Replace the missing '?' values with Nan to remove them
 adult_2020 = adult_2020.dropna(axis=0)
 adult_2020 = one_hot_encode(adult_2020, 'Work class')
@@ -236,12 +237,6 @@ def evaluate_acc(target_labels, true_labels):
 
 
 #################################################################################
-#####                          DATASET DESCRIPTION                          #####
-#################################################################################
-
-
-
-#################################################################################
 #####                                TRAINING                               #####
 #################################################################################
 
@@ -327,6 +322,49 @@ def find_parameters(training_set, plot=False):
 
 
 #################################################################################
+#####                              IRIS DATASET                             #####
+#################################################################################
+
+def iris_acc(predicted_class, true_class):
+  correct = 0
+  total = 0
+  for i in predicted_class:
+    if (true_class[i, predicted_class[i]] == 1):
+      correct += 1
+    total += 1
+  return correct / total
+
+def iris_logreg_predict(training_set, testing_set, lr=0.01, eps=0.01, max_iter=1000):
+  setosa_logreg = LogisticRegression(lr, eps, max_iter=max_iter)
+  versicolor_logreg = LogisticRegression(lr, eps, max_iter=max_iter)
+  virginica_logreg = LogisticRegression(lr, eps, max_iter=max_iter)
+
+  setosa_logreg.fit(training_set[:, :-3], training_set[:, -3])
+  versicolor_logreg.fit(training_set[:, :-3], training_set[:, -2])
+  virginica_logreg.fit(training_set[:, :-3], training_set[:, -1])
+
+  proba = setosa_logreg.predict_prob(testing_set[:, :-3])
+  proba = np.vstack([proba, versicolor_logreg.predict_prob(testing_set[:, :-3])])
+  proba = np.vstack([proba, virginica_logreg.predict_prob(testing_set[:, :-3])])
+
+  iris_class = np.argmax(proba, axis=0)
+
+  return iris_acc(iris_class, testing_set[:, -3:])
+
+def iris_logreg_cv(dataset, lr=0.01, eps=0.01, max_iter=1000, k=5, shuffle=False):
+  if shuffle:
+    np.random.shuffle
+  N, D = dataset.shape
+  index = np.linspace(0, N, k+1, False, dtype=np.int)
+  total_acc = 0
+  for i in range(k):
+    training_set = np.vstack([dataset[:index[i], :], dataset[index[i+1]:, :]])
+    testing_set = dataset[index[i]:index[i+1], :]
+    total_acc += iris_logreg_predict(training_set, testing_set, lr, eps, max_iter)
+  return total_acc/k
+
+
+#################################################################################
 #####                             RESULT ANALYSIS                           #####
 #################################################################################
 
@@ -374,7 +412,17 @@ def evaluate_model(dataset):
 #dataset = abalone_array
 dataset = iris_array
 
+np.random.shuffle(dataset)
+N, D = dataset.shape
 
-evaluate_log(dataset, plot=True)
+train_size = math.floor(N*0.8)
+training_set = dataset[:train_size, :]
+testing_set = dataset[train_size:, :]
+
+
+#evaluate_log(dataset, plot=True)
 #evaluate_model(dataset)
+
+print(iris_logreg_cv(dataset))
+
 

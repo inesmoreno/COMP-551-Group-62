@@ -78,6 +78,7 @@ adult_2020 = one_hot_encode(adult_2020, 'Race')
 adult_2020 = one_hot_encode(adult_2020, 'Sex')
 adult_2020 = one_hot_encode(adult_2020, 'Native Country')
 adult_2020 = one_hot_encode(adult_2020, 'Salary')
+adult_2020 = (adult_2020-adult_2020.min())/(adult_2020.max()-adult_2020.min())
 # null_counts = adult_2020.isnull().sum()
 # print(null_counts)
 

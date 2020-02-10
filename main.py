@@ -145,10 +145,7 @@ class LogisticRegression:
       z = np.dot(X, self.w)
       h = self.sigmoid(z)
 
-      print("z : ", z)
-      print("h : ", h)
-
-      print(f'loss: {self.cost(h, y)} \t')
+      #print(f'loss: {self.cost(h, y)} \t')
 
       k += 1
     return self.w
@@ -244,7 +241,7 @@ def evaluate_acc(target_labels, true_labels):
 #####                                TRAINING                               #####
 #################################################################################
 
-def find_parameters(training_set, plot=False):
+def find_parameters(training_set, plot=False, obj=accuracy, lr_pts=20, lr_str=0.002, lr_stp=0.002, eps_pts=10, eps_str=0.005, eps_stp=0.005, iter_pts=20, iter_str=200, iter_stp=200):
   # Finding the best learning rate
 
   lr_lst = []
@@ -253,12 +250,12 @@ def find_parameters(training_set, plot=False):
   best_lr = 0
 
   for i in range(20):
-    logreg = LogisticRegression(lr = 0.001 + 0.001*i)
-    acc = cross_validation(training_set[:, :-1], training_set[:, -1], logreg)
+    logreg = LogisticRegression(lr = 0.002 + 0.002*i)
+    acc = cross_validation(training_set[:, :-1], training_set[:, -1], logreg, obj=obj)
     if acc > best_acc:
       best_acc = acc
-      best_lr = 0.001 + 0.001*i
-    lr_lst.append(0.001 + 0.001*i)
+      best_lr = 0.002 + 0.002*i
+    lr_lst.append(0.002 + 0.002*i)
     acc_lst.append(acc)
 
   print("Best Learning Rate : ", best_lr)
@@ -279,12 +276,12 @@ def find_parameters(training_set, plot=False):
   best_eps = 0
 
   for i in range(10):
-    logreg = LogisticRegression(lr = best_lr, epsilon = 0.005 + 0.001*i)
+    logreg = LogisticRegression(lr = best_lr, epsilon = 0.005 + 0.005*i)
     acc = cross_validation(training_set[:, :-1], training_set[:, -1], logreg)
     if acc > best_acc:
       best_acc = acc
-      best_eps = 0.001 + 0.001*i
-    eps_lst.append(0.001 + 0.001*i)
+      best_eps = 0.005 + 0.005*i
+    eps_lst.append(0.005 + 0.005*i)
     acc_lst.append(acc)
 
   print("Best Epsilon : ", best_eps)
@@ -309,8 +306,8 @@ def find_parameters(training_set, plot=False):
     acc = cross_validation(training_set[:, :-1], training_set[:, -1], logreg)
     if acc > best_acc:
       best_acc = acc
-      best_iter = 100 + 100*i
-    iter_lst.append(100 + 100*i)
+      best_iter = 200 + 200*i
+    iter_lst.append(200 + 200*i)
     acc_lst.append(acc)
 
   print("Best Number of Iteration : ", best_iter)
@@ -367,12 +364,113 @@ def iris_logreg_cv(dataset, lr=0.01, eps=0.01, max_iter=1000, k=5, shuffle=False
     total_acc += iris_logreg_predict(training_set, testing_set, lr, eps, max_iter)
   return total_acc/k
 
+def find_parameters_iris(training_set, plot=False, lr_pts=20, lr_str=0.002, lr_stp=0.002, eps_pts=10, eps_str=0.005, eps_stp=0.005, iter_pts=20, iter_str=200, iter_stp=200):
+  # Finding the best learning rate
+
+  lr_lst = []
+  acc_lst = []
+  best_acc = 0
+  best_lr = 0
+
+  for i in range(20):
+    acc = iris_logreg_cv(training_set, lr=0.002 + 0.002*i)
+    if acc > best_acc:
+      best_acc = acc
+      best_lr = 0.002 + 0.002*i
+    lr_lst.append(0.002 + 0.002*i)
+    acc_lst.append(acc)
+
+  print("Best Learning Rate : ", best_lr)
+
+  if plot:
+    plt.plot(lr_lst, acc_lst)
+    plt.suptitle("Accuracy in function of the learning rate")
+    plt.xlabel("Learning Rate")
+    plt.ylabel("Accuracy")
+    plt.show()
+
+
+  # Finding the best epsilon
+
+  eps_lst = []
+  acc_lst = []
+  best_acc = 0
+  best_eps = 0
+
+  for i in range(10):
+    acc = iris_logreg_cv(training_set, lr=best_lr, eps=0.005 + 0.005*i)
+    if acc > best_acc:
+      best_acc = acc
+      best_eps = 0.005 + 0.005*i
+    eps_lst.append(0.005 + 0.005*i)
+    acc_lst.append(acc)
+
+  print("Best Epsilon : ", best_eps)
+
+  if plot:
+    plt.plot(eps_lst, acc_lst)
+    plt.suptitle("Accuracy in function of the epsilon")
+    plt.xlabel("Epsilon")
+    plt.ylabel("Accuracy")
+    plt.show()
+
+
+  # Finding the best number of iteration
+
+  iter_lst = []
+  acc_lst = []
+  best_acc = 0
+  best_iter = 0
+
+  for i in range(20):
+    acc = iris_logreg_cv(training_set, lr=best_lr, eps=best_eps, max_iter=200+200*i)
+    if acc > best_acc:
+      best_acc = acc
+      best_iter = 200 + 200*i
+    iter_lst.append(200 + 200*i)
+    acc_lst.append(acc)
+
+  print("Best Number of Iteration : ", best_iter)
+
+  if plot:
+    plt.plot(iter_lst, acc_lst)
+    plt.suptitle("Accuracy in function of the number of iteration")
+    plt.xlabel("Number of iteration")
+    plt.ylabel("Accuracy")
+    plt.show()
+
+  return best_lr, best_eps, best_iter
+
+def iris_evaluate_logreg(dataset):
+  perc_lst = []
+  acc_lst = []
+  N, D = dataset.shape
+  for i in range(7):
+    np.random.shuffle(dataset)
+    train_percent = 0.3 + 0.1*i
+
+    train_size = math.floor(N*train_percent)
+    training_set = dataset[:train_size, :]
+    testing_set = dataset[train_size:, :]
+  
+    lr, eps, iter = find_parameters_iris(training_set)
+
+    acc = iris_logreg_predict(training_set, testing_set, lr, eps, iter)
+    perc_lst.append(0.1 + 0.1*i)
+    acc_lst.append(acc)
+
+  plt.plot(perc_lst, acc_lst)
+  plt.suptitle("Accuracy in function of the training percentage")
+  plt.xlabel("Training Percentage")
+  plt.ylabel("Accuracy")
+  plt.show()
+
 
 #################################################################################
 #####                             RESULT ANALYSIS                           #####
 #################################################################################
 
-def evaluate_log(dataset, train_percent=0.8, plot=False):
+def evaluate_log(dataset, train_percent=0.8, plot=False, obj=accuracy):
   np.random.shuffle(dataset)
   N, D = dataset.shape
 
@@ -380,7 +478,7 @@ def evaluate_log(dataset, train_percent=0.8, plot=False):
   training_set = dataset[:train_size, :]
   testing_set = dataset[train_size:, :]
 
-  lr, eps, iter = find_parameters(training_set, plot=plot)
+  lr, eps, iter = find_parameters(training_set, plot=plot, obj=obj)
 
   logreg = LogisticRegression(lr, eps, max_iter=iter)
   logreg.fit(training_set[:, :-1], training_set[:, -1])
@@ -410,24 +508,22 @@ def evaluate_model(dataset):
   plt.show()
 
 
-
+# Uncomment the dataset that you want to use
 #dataset = ionosphere_array
 #dataset = adult_array
 #dataset = abalone_array
-dataset = iris_array
 
-np.random.shuffle(dataset)
-N, D = dataset.shape
-
-train_size = math.floor(N*0.8)
-training_set = dataset[:train_size, :]
-testing_set = dataset[train_size:, :]
-
-dataset = adult_array
-
-evaluate_log(dataset, plot=True)
+# Uncomment to get graphs about accuracy depending on the learning rate, epsilon and the number of iteration
+# Parameters : obj = evaluation function used; lr_pts = number of points computed for learning rate; lr_str = starting number for learning rate; lr_stp = size of the steps for learning rate; etc...
+#evaluate_log(dataset, plot=True)
+# Uncomment to get graphs about accuracy depending on the percentage of the dataset used for training
+# Parameters : obj = evaluation function used;
 #evaluate_model(dataset)
 
-#print(iris_logreg_cv(dataset))
+#dataset = iris_array
 
+# Uncomment to get graphs about accuracy depending on the learning rate, epsilon and the number of iteration
+#print(find_parameters_iris(dataset, plot=True))
+# Uncomment to get graphs about accuracy depending on the percentage of the dataset used for training
+#iris_evaluate_logreg(dataset)
 

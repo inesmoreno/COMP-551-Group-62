@@ -144,6 +144,10 @@ class LogisticRegression:
 
       z = np.dot(X, self.w)
       h = self.sigmoid(z)
+
+      print("z : ", z)
+      print("h : ", h)
+
       print(f'loss: {self.cost(h, y)} \t')
 
       k += 1
@@ -419,10 +423,11 @@ train_size = math.floor(N*0.8)
 training_set = dataset[:train_size, :]
 testing_set = dataset[train_size:, :]
 
+dataset = adult_array
 
-#evaluate_log(dataset, plot=True)
+evaluate_log(dataset, plot=True)
 #evaluate_model(dataset)
 
-print(iris_logreg_cv(dataset))
+#print(iris_logreg_cv(dataset))
 
 

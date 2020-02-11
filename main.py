@@ -91,6 +91,8 @@ abalone_2020 = abalone_2020.replace('?', np.nan)
 a_null = abalone_2020.isnull().sum()
 # correlation(abalone_2020, 0.9)
 abalone_2020 = one_hot_encode(abalone_2020, 'Sex')
+abalone_2020['Rings'][abalone_2020['Rings'] < 10] = 0
+abalone_2020['Rings'][abalone_2020['Rings'] >= 10] = 1
 
 #### DATASET 4 ####
 iris_2020 = pd.read_csv('iris.csv')

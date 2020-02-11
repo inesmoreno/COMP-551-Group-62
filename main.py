@@ -158,33 +158,47 @@ class LogisticRegression:
     self.proba = self.sigmoid(np.dot(X, self.w))
     return self.proba
 
-  def predict(self, X, threshold):
+  def predict(self, X, threshold=0.5):
     self.predict_prob(X)
     return np.multiply(self.proba >= threshold, 1)
 
 
 # Gaussian Naive Bayes
 class NaiveBayes:
-  def __init__(self, training, test):
-    self.__training = training
-    self.__test = test
-    self.__n = len(training)
+  def __init__(self):
+    self.mu = np.zeros(1)
+    self.s = np.zeros(1)
+    self.log_prior = np.zeros(1)
+    self.proba = np.zeros(1)
     
-  def fit(self, X, y, Xtest):
-    N, C = y.shape
+  def fit(self, X, y, noise=0.01):
+    if y.ndim == 1:
+      N = y.shape
+      new_y = (np.vstack([np.ones(N) - y, y])).transpose()
+    else:
+      new_y = y
+    N, C = new_y.shape
     D = X.shape[1]
-    mu, s = np.zeros((C, D)), np.zeros((C, D))
+    new_X = X + noise*np.random.rand(N, D)
+    self.mu, self.s = np.zeros((C, D)), np.zeros((C, D))
     for c in range(C):
-      inds = np.nonzero(y[:, c])[0]
-      mu[c, :] = np.std(X[inds, :], 0)
-      s[c, :] = np.std(X[inds, :], 0)
-    log_prior = np.log(np.mean(y, 0))[:, None]
-    log_likelihood = - np.sum(np.log(s[:, None, :]) + .5*(((X[None, :, :] - mu[: , None, :])/s[:, None, :])**2), 2)
-    return log_prior + log_likelihood
+      inds = np.nonzero(new_y[:, c])[0]
+      self.mu[c, :] = np.mean(new_X[inds, :], 0)
+      self.s[c, :] = np.std(new_X[inds, :], 0)
+    self.log_prior = np.log(np.mean(new_y, 0))[:, None]
+    return self.mu[: , None, :], self.s[:, None, :], self.log_prior
+    
 
-  def predict(self, yh, y):
-     return 0
+  def predict_prob(self, Xtest):
+    log_likelihood = - np.sum(np.log(self.s[:, None, :]) + .5*(((Xtest[None, :, :] - self.mu[: , None, :])/self.s[:, None, :])**2), 2)
+    self.proba = self.log_prior + log_likelihood
+    return self.proba
+
+  def predict(self, Xtest):
+    self.predict_prob(Xtest)
+    return np.argmax(self.proba, axis=0)
    	
+
 
 #################################################################################
 #####                                METHODS                                #####
@@ -222,13 +236,13 @@ def f1score(tp, fp, tn, fn):
 
 def cross_validation(X, y, classifier, k=5, shuffle=False, obj=accuracy):
   if shuffle:
-    np.random.shuffle
+    np.random.shuffle(dataset)
   N, D = X.shape
   index = np.linspace(0, N, k+1, False, dtype=np.int)
   total_obj = 0
   for i in range(k):
     classifier.fit(np.vstack([X[:index[i], :], X[index[i+1]:, :]]), np.hstack([y[:index[i]], y[index[i+1]:]]))
-    target_labels = classifier.predict(X[index[i]:index[i+1], :], 0.5)
+    target_labels = classifier.predict(X[index[i]:index[i+1], :])
     tp, fp, tn, fn = count_result(target_labels, y[index[i]:index[i+1]])
     total_obj += obj(tp, fp, tn, fn)
   return total_obj/k
@@ -236,6 +250,8 @@ def cross_validation(X, y, classifier, k=5, shuffle=False, obj=accuracy):
 def evaluate_acc(target_labels, true_labels):
   tp, fp, tn, fn = count_result(target_labels, true_labels)
   return accuracy(tp, fp, tn, fn)
+
+
 
 
 #################################################################################
@@ -320,7 +336,7 @@ def find_parameters(training_set, plot=False, obj=accuracy, lr_pts=20, lr_str=0.
     plt.ylabel("Accuracy")
     plt.show()
 
-  return best_lr, best_eps, best_iter
+  return best_lr, best_eps, best_iter, best_acc
 
 
 #################################################################################
@@ -355,7 +371,7 @@ def iris_logreg_predict(training_set, testing_set, lr=0.01, eps=0.01, max_iter=1
 
 def iris_logreg_cv(dataset, lr=0.01, eps=0.01, max_iter=1000, k=5, shuffle=False):
   if shuffle:
-    np.random.shuffle
+    np.random.shuffle(dataset)
   N, D = dataset.shape
   index = np.linspace(0, N, k+1, False, dtype=np.int)
   total_acc = 0
@@ -440,11 +456,12 @@ def find_parameters_iris(training_set, plot=False, lr_pts=20, lr_str=0.002, lr_s
     plt.ylabel("Accuracy")
     plt.show()
 
-  return best_lr, best_eps, best_iter
+  return best_lr, best_eps, best_iter, best_acc
 
 def iris_evaluate_logreg(dataset):
   perc_lst = []
   acc_lst = []
+  train_lst = []
   N, D = dataset.shape
   for i in range(7):
     np.random.shuffle(dataset)
@@ -454,17 +471,107 @@ def iris_evaluate_logreg(dataset):
     training_set = dataset[:train_size, :]
     testing_set = dataset[train_size:, :]
   
-    lr, eps, iter = find_parameters_iris(training_set)
+    lr, eps, iter, train_acc = find_parameters_iris(training_set)
+    train_lst.append(train_acc)
 
     acc = iris_logreg_predict(training_set, testing_set, lr, eps, iter)
     perc_lst.append(0.1 + 0.1*i)
     acc_lst.append(acc)
 
-  plt.plot(perc_lst, acc_lst)
+  plt.plot(perc_lst, acc_lst, label="Testing Accuracy")
+  plt.plot(train_lst, acc_lst, color="red", label="Training Accuracy")
   plt.suptitle("Accuracy in function of the training percentage")
   plt.xlabel("Training Percentage")
   plt.ylabel("Accuracy")
   plt.show()
+
+
+def iris_nb_cv(dataset, k=5, shuffle=False):
+  if shuffle:
+    np.random.shuffle(dataset)
+  N, D = dataset.shape
+  index = np.linspace(0, N, k+1, False, dtype=np.int)
+  nb = NaiveBayes()
+  total_acc = 0
+  for i in range(k):
+    training_set = np.vstack([dataset[:index[i], :], dataset[index[i+1]:, :]])
+    testing_set = dataset[index[i]:index[i+1], :]
+
+    nb.fit(training_set[:, :-3], training_set[:, -3:])
+    predicted_class = nb.predict(testing_set[:, :-3])
+
+    total_acc += iris_acc(predicted_class, testing_set[:, -3:])
+  return total_acc/k
+
+def iris_evaluate_nb(dataset):
+  perc_lst = []
+  acc_lst = []
+  train_lst = []
+  N, D = dataset.shape
+  for i in range(7):
+    np.random.shuffle(dataset)
+    train_percent = 0.3 + 0.1*i
+
+    train_size = math.floor(N*train_percent)
+    training_set = dataset[:train_size, :]
+    testing_set = dataset[train_size:, :]
+
+    train_acc = iris_nb_cv(training_set)
+    train_lst.append(train_acc)
+
+    nb = NaiveBayes()
+    nb.fit(training_set[:, :-3], training_set[:, -3:])
+    predicted_class = nb.predict(testing_set[:, :-3])
+
+    acc = iris_acc(predicted_class, testing_set[:, -3:])
+
+    perc_lst.append(0.1 + 0.1*i)
+    acc_lst.append(acc)
+
+  plt.plot(perc_lst, acc_lst, label="Testing Accuracy")
+  plt.plot(perc_lst, train_lst, color="red", label="Training Accuracy")
+  plt.suptitle("Accuracy in function of the training percentage")
+  plt.xlabel("Training Percentage")
+  plt.ylabel("Accuracy")
+  plt.show()
+
+
+def iris_compare(dataset, train_percent=0.8):
+  np.random.shuffle(dataset)
+  N, D = dataset.shape
+  
+  train_size = math.floor(N*train_percent)
+  training_set = dataset[:train_size, :]
+  testing_set = dataset[train_size:, :]
+
+  lr, eps, iter, lr_train_acc = find_parameters_iris(training_set)
+  lr_acc = iris_logreg_predict(training_set, testing_set, lr, eps, iter)
+
+  nb = NaiveBayes()
+  nb_train_acc = iris_nb_cv(training_set)
+  nb.fit(training_set[:, :-3], training_set[:, -3:])
+  predicted_class = nb.predict(testing_set[:, :-3])
+  nb_acc = iris_acc(predicted_class, testing_set[:, -3:])
+
+  labels = ["Training Accuracy", "Testing Accuracy"]
+  x = np.arange(2)
+  width = 0.35
+
+  fig, ax = plt.subplots()
+  ax.bar(x - width/2, [lr_train_acc, lr_acc], width, label='Logistic Regression')
+  ax.bar(x + width/2,[nb_train_acc, nb_acc], width, label='Naive Bayes')
+
+  # Add some text for labels, title and custom x-axis tick labels, etc.
+  ax.set_ylabel('Accuracy')
+  ax.set_title('Comparison between Logistic Regression and Naive Bayes')
+  ax.set_xticks(x)
+  ax.set_xticklabels(labels)
+  ax.legend()
+
+  plt.show()
+
+  return(lr_train_acc, nb_train_acc, lr_acc, nb_acc)
+
 
 
 #################################################################################
@@ -479,11 +586,11 @@ def evaluate_log(dataset, train_percent=0.8, plot=False, obj=accuracy):
   training_set = dataset[:train_size, :]
   testing_set = dataset[train_size:, :]
 
-  lr, eps, iter = find_parameters(training_set, plot=plot, obj=obj)
+  lr, eps, iter, train_acc = find_parameters(training_set, plot=plot, obj=obj)
 
   logreg = LogisticRegression(lr, eps, max_iter=iter)
   logreg.fit(training_set[:, :-1], training_set[:, -1])
-  target_labels = logreg.predict(testing_set[:, :-1], 0.5)
+  target_labels = logreg.predict(testing_set[:, :-1])
   tp, fp, tn, fn = count_result(target_labels, testing_set[:, -1])
 
   print("Accuracy : ", accuracy(tp, fp, tn, fn))
@@ -492,21 +599,69 @@ def evaluate_log(dataset, train_percent=0.8, plot=False, obj=accuracy):
   print("Recall : ", recall(tp, fp, tn, fn))
   print("F1-score : ", f1score(tp, fp, tn, fn))
 
-  return accuracy(tp, fp, tn, fn)
+  return train_acc, obj(tp, fp, tn, fn)
 
 def evaluate_model(dataset):
   perc_lst = []
   acc_lst = []
+  train_lst = []
   for i in range(9):
-    acc = evaluate_log(dataset, train_percent = 0.1 + 0.1*i)
+    train_acc, acc = evaluate_log(dataset, train_percent = 0.1 + 0.1*i)
     perc_lst.append(0.1 + 0.1*i)
     acc_lst.append(acc)
+    train_lst.append(train_acc)
 
-  plt.plot(perc_lst, acc_lst)
+  plt.plot(perc_lst, acc_lst, label="Testing Accuracy")
+  plt.plot(perc_lst, train_lst, color="red", label="Training Accuracy")
   plt.suptitle("Accuracy in function of the training percentage")
   plt.xlabel("Training Percentage")
   plt.ylabel("Accuracy")
   plt.show()
+
+def compare(dataset, train_percent=0.8):
+  np.random.shuffle(dataset)
+  N, D = dataset.shape
+
+  train_size = math.floor(N*train_percent)
+  training_set = dataset[:train_size, :]
+  testing_set = dataset[train_size:, :]
+
+  lr = LogisticRegression()
+  nb = NaiveBayes()
+  
+  train_acc_lr = cross_validation(training_set[:, :-1], training_set[:, -1], lr)
+  train_acc_nb = cross_validation(training_set[:, :-1], training_set[:, -1], nb)
+
+  lr.fit(training_set[:, :-1], training_set[:, -1])
+  lr_class = lr.predict(testing_set[:, :-1])
+  tp, fp, tn, fn = count_result(lr_class, testing_set[:, -1])
+  acc_lr = accuracy(tp, fp, tn, fn)
+
+  nb.fit(training_set[:, :-1], training_set[:, -1])
+  nb_class = nb.predict(testing_set[:, :-1])
+  tp, fp, tn, fn = count_result(nb_class, testing_set[:, -1])
+  acc_nb = accuracy(tp, fp, tn, fn)
+
+
+  labels = ["Training Accuracy", "Testing Accuracy"]
+  x = np.arange(2)
+  width = 0.35
+
+  fig, ax = plt.subplots()
+  ax.bar(x - width/2, [train_acc_lr, acc_lr], width, label='Logistic Regression')
+  ax.bar(x + width/2,[train_acc_nb, acc_nb], width, label='Naive Bayes')
+
+  # Add some text for labels, title and custom x-axis tick labels, etc.
+  ax.set_ylabel('Accuracy')
+  ax.set_title('Comparison between Logistic Regression and Naive Bayes')
+  ax.set_xticks(x)
+  ax.set_xticklabels(labels)
+  ax.legend()
+
+  plt.show()
+
+  return(train_acc_lr, train_acc_nb, acc_lr, acc_nb)
+
 
 
 # Uncomment the dataset that you want to use
@@ -514,6 +669,8 @@ def evaluate_model(dataset):
 #dataset = adult_array
 #dataset = abalone_array
 
+# Uncomment to get graph comparing accuracy between Logistic Regression and Naive Bayes
+#compare(dataset)
 # Uncomment to get graphs about accuracy depending on the learning rate, epsilon and the number of iteration
 # Parameters : obj = evaluation function used; lr_pts = number of points computed for learning rate; lr_str = starting number for learning rate; lr_stp = size of the steps for learning rate; etc...
 #evaluate_log(dataset, plot=True)

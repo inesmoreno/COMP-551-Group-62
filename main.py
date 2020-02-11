@@ -236,9 +236,7 @@ def recall(tp, fp, tn, fn):
 def f1score(tp, fp, tn, fn):
     return 2 * (tp/(tp + fp)) * (tp/(tp + fn)) / ((tp/(tp + fp)) + (tp/(tp + fn)))
 
-def cross_validation(X, y, classifier, k=5, shuffle=False, obj=accuracy):
-  if shuffle:
-    np.random.shuffle(dataset)
+def cross_validation(X, y, classifier, k=5, obj=accuracy):
   N, D = X.shape
   index = np.linspace(0, N, k+1, False, dtype=np.int)
   total_obj = 0
@@ -481,10 +479,11 @@ def iris_evaluate_logreg(dataset):
     acc_lst.append(acc)
 
   plt.plot(perc_lst, acc_lst, label="Testing Accuracy")
-  plt.plot(train_lst, acc_lst, color="red", label="Training Accuracy")
+  plt.plot(perc_lst, train_lst, color="red", label="Training Accuracy")
   plt.suptitle("Accuracy in function of the training percentage")
   plt.xlabel("Training Percentage")
   plt.ylabel("Accuracy")
+  plt.legend()
   plt.show()
 
 
@@ -618,9 +617,42 @@ def evaluate_model(dataset):
   plt.suptitle("Accuracy in function of the training percentage")
   plt.xlabel("Training Percentage")
   plt.ylabel("Accuracy")
+  plt.legend()
   plt.show()
 
-def compare(dataset, train_percent=0.8):
+def evaluate_nb(dataset, obj=accuracy):
+  perc_lst = []
+  acc_lst = []
+  train_lst = []
+  for i in range(9):
+    train_percent = 0.1 + 0.1*i
+    np.random.shuffle(dataset)
+    N, D = dataset.shape
+
+    train_size = math.floor(N*train_percent)
+    training_set = dataset[:train_size, :]
+    testing_set = dataset[train_size:, :]
+
+    nb = NaiveBayes()
+
+    train_acc = cross_validation(training_set[:, :-1], training_set[:, -1], nb, obj=obj)
+    nb.fit(training_set[:, :-1], training_set[:, -1])
+    target_labels = nb.predict(testing_set[:, :-1])
+    tp, fp, tn, fn = count_result(target_labels, testing_set[:, -1])
+    acc = obj(tp, fp, tn, fn)
+
+    perc_lst.append(train_percent)
+    acc_lst.append(acc)
+    train_lst.append(train_acc)
+
+  plt.plot(perc_lst, acc_lst, label="Testing Accuracy")
+  plt.plot(perc_lst, train_lst, color="red", label="Training Accuracy")
+  plt.suptitle("Accuracy in function of the training percentage")
+  plt.xlabel("Training Percentage")
+  plt.ylabel("Accuracy")
+  plt.show()
+
+def compare(dataset, train_percent=0.8, obj=accuracy):
   np.random.shuffle(dataset)
   N, D = dataset.shape
 
@@ -631,13 +663,13 @@ def compare(dataset, train_percent=0.8):
   lr = LogisticRegression()
   nb = NaiveBayes()
   
-  train_acc_lr = cross_validation(training_set[:, :-1], training_set[:, -1], lr)
-  train_acc_nb = cross_validation(training_set[:, :-1], training_set[:, -1], nb)
+  train_acc_lr = cross_validation(training_set[:, :-1], training_set[:, -1], lr, obj=obj)
+  train_acc_nb = cross_validation(training_set[:, :-1], training_set[:, -1], nb, obj=obj)
 
   lr.fit(training_set[:, :-1], training_set[:, -1])
   lr_class = lr.predict(testing_set[:, :-1])
   tp, fp, tn, fn = count_result(lr_class, testing_set[:, -1])
-  acc_lr = accuracy(tp, fp, tn, fn)
+  acc_lr = obj(tp, fp, tn, fn)
 
   nb.fit(training_set[:, :-1], training_set[:, -1])
   nb_class = nb.predict(testing_set[:, :-1])
@@ -668,7 +700,7 @@ def compare(dataset, train_percent=0.8):
 
 # Uncomment the dataset that you want to use
 #dataset = ionosphere_array
-#dataset = adult_array
+dataset = adult_array
 #dataset = abalone_array
 
 # Uncomment to get graph comparing accuracy between Logistic Regression and Naive Bayes
@@ -678,7 +710,9 @@ def compare(dataset, train_percent=0.8):
 #evaluate_log(dataset, plot=True)
 # Uncomment to get graphs about accuracy depending on the percentage of the dataset used for training
 # Parameters : obj = evaluation function used;
-#evaluate_model(dataset)
+evaluate_model(dataset)
+
+#evaluate_nb(dataset)
 
 #dataset = iris_array
 
@@ -686,4 +720,6 @@ def compare(dataset, train_percent=0.8):
 #print(find_parameters_iris(dataset, plot=True))
 # Uncomment to get graphs about accuracy depending on the percentage of the dataset used for training
 #iris_evaluate_logreg(dataset)
+
+#iris_compare(dataset)
 

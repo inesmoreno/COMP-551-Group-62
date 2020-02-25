@@ -45,10 +45,14 @@ def preprocessing_stem(filename, stemmer):
 ##########################################################
 ### Transforming the text into vectors + preprocessing ###
 ##########################################################
-### Feature extraction : transform each line into a vector of features
 
-def fit_vectorizer(vectorizer, raw_X, frequency=True, downscale=False):
-    X = vectorizer.fit_transform(raw_X)     # Create a vector of the number of occurence of each word
+### Feature extraction : transform each line into a vector of features
+def get_vectors(vectorizer, raw_X, frequency=True, downscale=False, fit=True):
+    # Create a vector of the number of occurence of each word
+    if fit:
+        X = vectorizer.fit_transform(raw_X)
+    else:
+        X = vectorizer.transform(raw_X)
     if frequency:
         if downscale:
             X = sk.feature_extraction.text.TfidfTransformer(use_idf=True).fit_transform(X)      # Change the vector of occurence into a vector of frequencies, with high frequencies being downscaled
@@ -153,7 +157,7 @@ def fit_min_threshold(min_t, max_t, step, vectorizer, clf, raw_X, Y, k=5):
     sparse_Y = scipy.sparse.csr_matrix(Y).transpose()
     for t in thresholds:
         vectorizer.set_params(min_df=t)
-        X = fit_vectorizer(vectorizer, raw_X)
+        X = get_vectors(vectorizer, raw_X)
         dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
         acc, ent = cross_validation(clf, dataset, k)
         if acc > best_acc:
@@ -182,7 +186,7 @@ def test_stopwords(stopwords_list, names_list, vectorizer, clf, raw_X, Y, k=5):
     sparse_Y = scipy.sparse.csr_matrix(Y).transpose()
     for s in stopwords_list:
         vectorizer.set_params(stop_words=s)
-        X = fit_vectorizer(vectorizer, raw_X)
+        X = get_vectors(vectorizer, raw_X)
         dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
         acc, ent = cross_validation(clf, dataset, k)
         acc_list.append(acc)
@@ -313,13 +317,26 @@ clf_names = ['Multinomial Naive Bayes', 'Complement Naive Bayes', 'Logistic Regr
 
 ### Find the hyperparameters of the classifier
 
-X = fit_vectorizer(vectorizer_classic, twenty_train.data[:1000])
+X = get_vectors(vectorizer_classic, twenty_train.data)
 
-Y = scipy.sparse.csr_matrix(twenty_train.target[:1000]).transpose()
+Y = scipy.sparse.csr_matrix(twenty_train.target).transpose()
 dataset = scipy.sparse.hstack([X, Y], format="csr")
 dataset = sk.utils.shuffle(dataset)
 
-compare_penalty_svm(svm, dataset)
+#compare_penalty_svm(svm, dataset)
+
+
+### Final test
+"""
+twenty_test = fetch_20newsgroups(subset='test', remove=(['headers', 'footers', 'quotes']))
+X_test = get_vectors(vectorizer_classic, twenty_test.data, fit=False)
+Y_test = scipy.sparse.csr_matrix(twenty_test.target).transpose()
+test_set = scipy.sparse.hstack([X_test, Y_test], format="csr")
+print(dataset.shape)
+print(test_set.shape)
+
+evaluate_model(cnb, dataset, test_set)
+"""
 
 
 """ This concerns the dataset from my previous assignment, not relevant """

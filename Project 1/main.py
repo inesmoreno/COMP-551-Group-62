@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+import time
 
 pd.set_option('max_columns', 120)
 pd.set_option('max_colwidth', 5000)
@@ -825,7 +826,36 @@ def evaluate_nb(dataset, obj=accuracy):
   plt.show()
 
 
+dataset = iris_array
 
+train_percent = 0.8
+lr = LogisticRegression()
+nb = NaiveBayes()
+np.random.shuffle(dataset)
+N, D = dataset.shape
+
+train_size = math.floor(N*train_percent)
+training_set = dataset[:train_size, :]
+testing_set = dataset[train_size:, :]
+
+t1 = time.time()
+#cross_validation(training_set[:, :-1], training_set[:, -1], lr)
+iris_logreg_cv(dataset)
+t2 = time.time()
+#cross_validation(training_set[:, :-1], training_set[:, -1], nb)
+iris_nb_cv(dataset)
+t3 = time.time()
+
+print(t2-t1, t3-t2)
+
+"""
+lr : 0.3739914894104004 - nb : 0.0029909610748291016  ; lr : 0.36476588249206543 - nb : 0.003989219665527344
+lr : 37.25168251991272 - nb : 0.9193809032440186  ; lr : 30.400632619857788 - nb : 1.3094234466552734
+lr : 1.6502840518951416 - nb : 0.029920339584350586 ; lr : 1.4717061519622803 - nb : 0.03091740608215332
+lr : 0.6672160625457764 - nb : 0.002992868423461914 ; lr : 0.8187668323516846 - nb : 0.001993894577026367
+"""
+
+"""
 # Uncomment the dataset that you want to use
 dataset = ionosphere_array
 #dataset = adult_array
@@ -854,7 +884,7 @@ evaluate_nb(dataset)
 # Uncomment to get graphs about accuracy depending on the percentage of the dataset used for training
 #iris_evaluate_logreg(dataset)
 #iris_evaluate_nb(dataset)
-
+"""
 
 
 

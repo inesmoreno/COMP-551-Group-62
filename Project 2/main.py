@@ -32,13 +32,6 @@ To do list :
 """ Not adapted right not, might delete later """
 ### Text processing : apply stemmers/lemmatizers on the text and separate each line
 
-def preprocessing(filename):
-    file = open(filename, "r")
-    X = []
-    for l in file:
-        X.append(l)
-    return X
-
 def preprocessing_stem(filename, stemmer):
     file = open(filename, "r")
     X = []
@@ -147,22 +140,6 @@ def cross_validation(clf, dataset, k=5):
     return avg_acc/k, avg_ent/k
 
 
-### Test different classifiers and compare their results
-def compare_classifiers(clf_list, clf_names, dataset, k=5):
-    acc_list, ent_list = [], []
-    for c in clf_list:
-        acc, ent = cross_validation(c, dataset, k)
-        acc_list.append(acc)
-        ent_list.append(ent)
-    
-    plt.bar(clf_names, acc_list)
-    plt.title('Accuracy')
-    plt.show()
-    plt.bar(clf_names, ent_list)
-    plt.title('Log Cross Entropy')
-    plt.show()
-
-
 ###################################################################################
 ### Analysing the effect of preprocessing on the performance of the classifiers ###
 ###################################################################################
@@ -186,10 +163,14 @@ def fit_min_threshold(min_t, max_t, step, vectorizer, clf, raw_X, Y, k=5):
         ent_list.append(ent)
 
     plt.plot(thresholds, acc_list, 'ro')
-    plt.title('Accuracy')
+    plt.xlabel('Minimum threshold')
+    plt.ylabel('Accuracy')
+    plt.title('Accuracy in function of the minimum threshold')
     plt.show()
     plt.plot(thresholds, ent_list, 'ro')
-    plt.title('Log Cross Entropy')
+    plt.xlabel('Minimum threshold')
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Log Cross Entropy in function of the minimum threshold')
     plt.show()
 
     return best_thresh
@@ -208,10 +189,12 @@ def test_stopwords(stopwords_list, names_list, vectorizer, clf, raw_X, Y, k=5):
         ent_list.append(ent)
 
     plt.bar(names_list, acc_list)
-    plt.title('Accuracy')
+    plt.ylabel('Accuracy')
+    plt.title('Accuracy in function of the stopwords used')
     plt.show()
     plt.bar(names_list, ent_list)
-    plt.title('Log Cross Entropy')
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Log Cross Entropy in function of the stopwords used')
     plt.show()
 
 
@@ -265,15 +248,38 @@ def compare_penalty_svm(clf, dataset, penalties=['l1', 'l2'], k=5):
 
     # Plot the results
     plt.bar(penalties, acc_list)
-    plt.title('Accuracy')
+    plt.ylabel('Accuracy')
+    plt.title('Support Vector Machine (Accuracy in function of the penalty)')
     plt.show()
     plt.bar(penalties, ent_list)
-    plt.title('Log Cross Entropy')
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Support Vector Machine (Log Cross Entropy in function of the penalty)')
     plt.show()
 
 
-### Final Training / Testing
 
+####################################################################################
+### Analyze the performance of the different classifiers and choose the best one ###
+####################################################################################
+
+### Test different classifiers and compare their results
+def compare_classifiers(clf_list, clf_names, dataset, k=5):
+    acc_list, ent_list = [], []
+    for c in clf_list:
+        acc, ent = cross_validation(c, dataset, k)
+        acc_list.append(acc)
+        ent_list.append(ent)
+    
+    plt.bar(clf_names, acc_list)
+    plt.ylabel('Accuracy')
+    plt.title('Accuracy of the different classifiers')
+    plt.show()
+    plt.bar(clf_names, ent_list)
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Log Cross Entropy of the different classifiers')
+    plt.show()
+
+### Final Training / Testing
 def evaluate_model(clf, train_set, test_set):
     res = test_classifier(clf, train_set, test_set)
     mat = confusion_matrix(res, test_set[:, -1])
@@ -303,14 +309,15 @@ clf_names = ['Multinomial Naive Bayes', 'Complement Naive Bayes', 'Logistic Regr
 
 ### Choose the preprocessing parameters
 
-fit_min_threshold(0, 0.25, 5, vectorizer_classic, cnb, twenty_train.data[:600], twenty_train.target[:600], 5)
+#fit_min_threshold(0, 0.25, 5, vectorizer_classic, cnb, twenty_train.data[:600], twenty_train.target[:600], 5)
 
 ### Find the hyperparameters of the classifier
 
-X = fit_vectorizer(vectorizer_classic, twenty_train.data[:600])
+X = fit_vectorizer(vectorizer_classic, twenty_train.data[:1000])
 
-Y = scipy.sparse.csr_matrix(twenty_train.target[:600]).transpose()
+Y = scipy.sparse.csr_matrix(twenty_train.target[:1000]).transpose()
 dataset = scipy.sparse.hstack([X, Y], format="csr")
+dataset = sk.utils.shuffle(dataset)
 
 compare_penalty_svm(svm, dataset)
 
@@ -324,38 +331,13 @@ compare_penalty_svm(svm, dataset)
 def naive_tokenizer(s):
     return s.split()
 
-min_thresh = 0
-max_thresh = 0.6
-
-sw_lst = [None, 'english', stopwords.words('english')]
-sw_names = ['None', 'Scikit.learn', 'NLTK']
-
-vectorizer_naive = sk.feature_extraction.text.CountVectorizer(tokenizer=naive_tokenizer, max_df=max_thresh, min_df=min_thresh)
-vectorizer_classic = sk.feature_extraction.text.CountVectorizer(max_df = max_thresh, min_df=min_thresh)
-
 ps = PorterStemmer()
-#pst = PunktSentenceTokenizer(raw_X)
-
-mnb = nb.MultinomialNB(alpha=0.8)
-cnb = nb.ComplementNB(alpha=0.84)
-lr = sk.linear_model.LogisticRegression(solver='liblinear', max_iter=500)
-svm = sk.svm.LinearSVC()
-
-clf_list = [mnb, cnb, lr, svm]
-clf_names = ['Multinomial Naive Bayes', 'Complement Naive Bayes', 'Logistic Regression', 'Support Vector Machine']
-
 #######################
 
 
 neg_X = preprocessing_stem('.\\rt-polaritydata\\rt-polaritydata\\rt-polarity.neg', ps)
 pos_X = preprocessing_stem('.\\rt-polaritydata\\rt-polaritydata\\rt-polarity.pos', ps)
 raw_X = neg_X + pos_X
-n_neg = len(neg_X)
-n_pos = len(pos_X)
-n = n_neg + n_pos
-
-Y_neg = np.array(([1 for i in range(n_neg)] + [0 for i in range(n_pos)]), ndmin=2).transpose()
-Y_pos = np.array(([0 for i in range(n_neg)] + [1 for i in range(n_pos)]), ndmin=2).transpose()
 
 pst = PunktSentenceTokenizer(raw_X)
 
@@ -364,18 +346,4 @@ pst = PunktSentenceTokenizer(raw_X)
 svm1 = sk.svm.LinearSVC(penalty='l2', loss='hinge', max_iter=2000)
 svm2 = sk.svm.LinearSVC(loss='squared_hinge', max_iter=2000)
 svm3 = sk.svm.LinearSVC(dual=False, max_iter=2000)
-
-test_model(svm1, dataset, 0.7, 20)
-test_model(svm2, dataset, 0.7, 20)
-test_model(svm3, dataset, 0.7, 20)
-
-fit_smoothing_nb(20, vect, cnb, dataset, 0.7, 20)
-
-compare_classifiers(clf_list, clf_names, dataset, 0.7, 10)
-
-fit_min_threshold(0, 0.01, 50, vectorizer_classic, cnb, raw_X, Y_neg, 0.7, 10)
-
-test_stopwords(sw_lst, sw_names, vectorizer_classic, lr, raw_X, Y_neg, 0.7, 10)
-
-test_model(cnb, dataset, 0.7, 20)
 """

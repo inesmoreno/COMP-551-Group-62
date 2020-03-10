@@ -240,6 +240,64 @@ def fit_smoothing_nb(clf, dataset, step, k=5):
 
     return best_alpha
 
+def fit_smoothing_adaboost(clf, dataset, step, k=5):
+    smooth_lst = np.linspace(5, 100, step)  # The list of the values of the parameter that we will test. We vary the
+    # parameter from 0 to 1 testing 'step' values (i.e. 'step' is the number of points)
+    acc_list, ent_list = [], []  # Lists storing the results
+    best_acc, best_alpha = 0, 0
+    for a in smooth_lst:
+        clf.set_params(n_estimators=a)  # Set the parameter to the next value
+        acc, ent = cross_validation(clf, dataset,
+                                    k)  # Train the model, then evaluate its performance using cross validation
+        if acc > best_acc:
+            best_acc = acc
+            best_alpha = a
+        acc_list.append(acc)
+        ent_list.append(ent)
+
+    # Plot the results
+    plt.plot(smooth_lst, acc_list, 'ro')
+    plt.xlabel('Smoothing factor')
+    plt.ylabel('Accuracy')
+    plt.title('Adaboost (Accuracy depending on Smoothing Factor)')
+    plt.show()
+    plt.plot(smooth_lst, ent_list, 'ro')
+    plt.xlabel('Smoothing factor')
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Adaboost (Log Cross Entropy depending on Smoothing Factor)')
+    plt.show()
+
+    return best_alpha
+
+
+def fit_smoothing_random_forest(clf, dataset, step, k=5):
+    smooth_lst = np.linspace(1, 100, step)  # The list of the values of the parameter that we will test. We vary the
+    # parameter from 0 to 1 testing 'step' values (i.e. 'step' is the number of points)
+    acc_list, ent_list = [], []  # Lists storing the results
+    best_acc, best_alpha = 0, 0
+    for a in smooth_lst:
+        clf.set_params(n_estimators=a)  # Set the parameter to the next value
+        acc, ent = cross_validation(clf, dataset,
+                                    k)  # Train the model, then evaluate its performance using cross validation
+        if acc > best_acc:
+            best_acc = acc
+            best_alpha = a
+        acc_list.append(acc)
+        ent_list.append(ent)
+
+    # Plot the results
+    plt.plot(smooth_lst, acc_list, 'ro')
+    plt.xlabel('Smoothing factor')
+    plt.ylabel('Accuracy')
+    plt.title('Random Forest (Accuracy depending on Smoothing Factor)')
+    plt.show()
+    plt.plot(smooth_lst, ent_list, 'ro')
+    plt.xlabel('Smoothing factor')
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Random Forest (Log Cross Entropy depending on Smoothing Factor)')
+    plt.show()
+
+    return best_alpha
 
 """ For discrete parameters """
 def compare_penalty_svm(clf, dataset, penalties=['l1', 'l2'], k=5):
@@ -260,7 +318,24 @@ def compare_penalty_svm(clf, dataset, penalties=['l1', 'l2'], k=5):
     plt.title('Support Vector Machine (Log Cross Entropy in function of the penalty)')
     plt.show()
 
+def compare_penalty_decision_tree(clf, dataset, penalties=['gini', 'entropy'], k=5):
+    acc_list, ent_list = [], []  # Lists storing the results
+    for p in penalties:
+        clf.set_params(criterion=p)  # Set the parameter to the next value
+        acc, ent = cross_validation(clf, dataset,
+                                    k)  # Train the model, then evaluate its performance using cross validation
+        acc_list.append(acc)
+        ent_list.append(ent)
 
+    # Plot the results
+    plt.bar(penalties, acc_list)
+    plt.ylabel('Accuracy')
+    plt.title('Decision Tree (Accuracy in function of the penalty)')
+    plt.show()
+    plt.bar(penalties, ent_list)
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Decision Tree (Log Cross Entropy in function of the penalty)')
+    plt.show()
 
 ####################################################################################
 ### Analyze the performance of the different classifiers and choose the best one ###
@@ -307,10 +382,13 @@ mnb = nb.MultinomialNB(alpha=0.8)
 cnb = nb.ComplementNB(alpha=0.84)
 lr = sk.linear_model.LogisticRegression(solver='lbfgs', max_iter=500, multi_class='multinomial')
 svm = sk.svm.LinearSVC(dual=False)
+dtr = sk.tree.DecisionTreeClassifier
+rfc = sk.ensemble.RandomForestClassifier
+ada = sk.ensemble.AdaBoostClassifier
 
-clf_list = [mnb, cnb, lr, svm]
-clf_names = ['Multinomial Naive Bayes', 'Complement Naive Bayes', 'Logistic Regression', 'Support Vector Machine']
-
+clf_list = [mnb, cnb, lr, svm, dtr, rfc, ada]
+clf_names = ['Multinomial Naive Bayes', 'Complement Naive Bayes', 'Logistic Regression', 'Support Vector Machine',
+             'Decision Tree', 'Random Forest', 'AdaBoost']
 ### Choose the preprocessing parameters
 
 #fit_min_threshold(0, 0.25, 5, vectorizer_classic, cnb, twenty_train.data[:600], twenty_train.target[:600], 5)

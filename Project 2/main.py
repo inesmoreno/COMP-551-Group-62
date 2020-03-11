@@ -1,4 +1,5 @@
 import numpy as np
+from glob import glob
 import nltk
 import scipy
 from nltk.stem import PorterStemmer
@@ -8,7 +9,14 @@ import sklearn as sk
 import sklearn.naive_bayes as nb
 import math
 import matplotlib.pyplot as plt
+import os, re, string
+
+# Get the data
 from sklearn.datasets import fetch_20newsgroups
+os.system("wget http://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz")
+os.system("gunzip aclImdb_v1.tar.gz")
+os.system("tar -xvf aclImdb_v1.tar")
+
 
 
 #nltk.download()
@@ -240,8 +248,94 @@ def fit_smoothing_nb(clf, dataset, step, k=5):
 
     return best_alpha
 
+def fit_smoothing_adaboost(clf, dataset, step, k=5):
+    smooth_lst = np.linspace(5, 100, step)  # The list of the values of the parameter that we will test. We vary the
+    # parameter from 0 to 1 testing 'step' values (i.e. 'step' is the number of points)
+    acc_list, ent_list = [], []  # Lists storing the results
+    best_acc, best_alpha = 0, 0
+    for a in smooth_lst:
+        clf.set_params(n_estimators=a)  # Set the parameter to the next value
+        acc, ent = cross_validation(clf, dataset,
+                                    k)  # Train the model, then evaluate its performance using cross validation
+        if acc > best_acc:
+            best_acc = acc
+            best_alpha = a
+        acc_list.append(acc)
+        ent_list.append(ent)
 
-""" For discrete parameters """
+    # Plot the results
+    plt.plot(smooth_lst, acc_list, 'ro')
+    plt.xlabel('Smoothing factor')
+    plt.ylabel('Accuracy')
+    plt.title('Adaboost (Accuracy depending on Smoothing Factor)')
+    plt.show()
+    plt.plot(smooth_lst, ent_list, 'ro')
+    plt.xlabel('Smoothing factor')
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Adaboost (Log Cross Entropy depending on Smoothing Factor)')
+    plt.show()
+
+    return best_alpha
+
+
+def fit_smoothing_random_forest(clf, dataset, step, k=5):
+    smooth_lst = np.linspace(1, 100, step)  # The list of the values of the parameter that we will test. We vary the
+    # parameter from 0 to 1 testing 'step' values (i.e. 'step' is the number of points)
+    acc_list, ent_list = [], []  # Lists storing the results
+    best_acc, best_alpha = 0, 0
+    for a in smooth_lst:
+        clf.set_params(n_estimators=a)  # Set the parameter to the next value
+        acc, ent = cross_validation(clf, dataset,
+                                    k)  # Train the model, then evaluate its performance using cross validation
+        if acc > best_acc:
+            best_acc = acc
+            best_alpha = a
+        acc_list.append(acc)
+        ent_list.append(ent)
+
+    # Plot the results
+    plt.plot(smooth_lst, acc_list, 'ro')
+    plt.xlabel('Smoothing factor')
+    plt.ylabel('Accuracy')
+    plt.title('Random Forest (Accuracy depending on Smoothing Factor)')
+    plt.show()
+    plt.plot(smooth_lst, ent_list, 'ro')
+    plt.xlabel('Smoothing factor')
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Random Forest (Log Cross Entropy depending on Smoothing Factor)')
+    plt.show()
+
+    return best_alpha
+
+def fit_smoothing_multinomial_nb(clf, dataset, step, k=5):
+    smooth_lst = np.linspace(1.0e-8, 1, step)    # The list of the values of the parameter that we will test. We vary the parameter from 0 to 1 testing 'step' values (i.e. 'step' is the number of points)
+    acc_list, ent_list = [], []     # Lists storing the results
+    best_acc, best_alpha = 0, 0
+    for a in smooth_lst:
+        clf.set_params(alpha=a)     # Set the parameter to the next value
+        acc, ent = cross_validation(clf, dataset, k)      # Train the model, then evaluate its performance using cross validation
+        if acc > best_acc:
+            best_acc = acc
+            best_alpha = a
+        acc_list.append(acc)
+        ent_list.append(ent)
+
+    # Plot the results
+    plt.plot(smooth_lst, acc_list, 'ro')
+    plt.xlabel('Smoothing factor')
+    plt.ylabel('Accuracy')
+    plt.title('Multinomial Naive Bayes (Accuracy depending on Smoothing Factor)')
+    plt.show()
+    plt.plot(smooth_lst, ent_list, 'ro')
+    plt.xlabel('Smoothing factor')
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Multinomial Naive Bayes (Log Cross Entropy depending on Smoothing Factor)')
+    plt.show()
+
+    return best_alpha
+
+
+"""" For discrete parameters """
 def compare_penalty_svm(clf, dataset, penalties=['l1', 'l2'], k=5):
     acc_list, ent_list = [], []     # Lists storing the results
     for p in penalties:
@@ -260,7 +354,42 @@ def compare_penalty_svm(clf, dataset, penalties=['l1', 'l2'], k=5):
     plt.title('Support Vector Machine (Log Cross Entropy in function of the penalty)')
     plt.show()
 
+def compare_criterion_logistic_regression(clf, dataset, criterions=['gini', 'entropy'], k=5):
+    acc_list, ent_list = [], []     # Lists storing the results
+    for c in criterions:
+        clf.set_params(criterion=c)     # Set the parameter to the next value
+        acc, ent = cross_validation(clf, dataset, k)      # Train the model, then evaluate its performance using cross validation
+        acc_list.append(acc)
+        ent_list.append(ent)
 
+    # Plot the results
+    plt.bar(criterions, acc_list)
+    plt.ylabel('Accuracy')
+    plt.title('Logistic Regression (Accuracy in function of the criterion)')
+    plt.show()
+    plt.bar(criterions, ent_list)
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Logistic Regression (Log Cross Entropy in function of the criterion)')
+    plt.show()
+
+def compare_criterion_decision_tree(clf, dataset, criterions=['gini', 'entropy'], k=5):
+    acc_list, ent_list = [], []  # Lists storing the results
+    for c in criterions:
+        clf.set_params(criterion=c)  # Set the parameter to the next value
+        acc, ent = cross_validation(clf, dataset,
+                                    k)  # Train the model, then evaluate its performance using cross validation
+        acc_list.append(acc)
+        ent_list.append(ent)
+
+    # Plot the results
+    plt.bar(criterions, acc_list)
+    plt.ylabel('Accuracy')
+    plt.title('Decision Tree (Accuracy in function of the criterion)')
+    plt.show()
+    plt.bar(criterions, ent_list)
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Decision Tree (Log Cross Entropy in function of the criterion)')
+    plt.show()
 
 ####################################################################################
 ### Analyze the performance of the different classifiers and choose the best one ###
@@ -296,7 +425,7 @@ def evaluate_model(clf, train_set, test_set):
 ### Application to the datasets ###
 ###################################
 
-
+### 20 NEWS GROUP DATASET ###
 twenty_train = fetch_20newsgroups(subset='train', remove=(['headers', 'footers', 'quotes']))
 vectorizer_classic = sk.feature_extraction.text.CountVectorizer()
 
@@ -307,10 +436,13 @@ mnb = nb.MultinomialNB(alpha=0.8)
 cnb = nb.ComplementNB(alpha=0.84)
 lr = sk.linear_model.LogisticRegression(solver='lbfgs', max_iter=500, multi_class='multinomial')
 svm = sk.svm.LinearSVC(dual=False)
+dtr = sk.tree.DecisionTreeClassifier
+rfc = sk.ensemble.RandomForestClassifier
+ada = sk.ensemble.AdaBoostClassifier
 
-clf_list = [mnb, cnb, lr, svm]
-clf_names = ['Multinomial Naive Bayes', 'Complement Naive Bayes', 'Logistic Regression', 'Support Vector Machine']
-
+clf_list = [mnb, cnb, lr, svm, dtr, rfc, ada]
+clf_names = ['Multinomial Naive Bayes', 'Complement Naive Bayes', 'Logistic Regression', 'Support Vector Machine',
+             'Decision Tree', 'Random Forest', 'AdaBoost']
 ### Choose the preprocessing parameters
 
 #fit_min_threshold(0, 0.25, 5, vectorizer_classic, cnb, twenty_train.data[:600], twenty_train.target[:600], 5)
@@ -339,6 +471,74 @@ print(test_set.shape)
 
 evaluate_model(cnb, dataset, test_set)
 """
+
+### IMDB DATASET ###
+
+"""train_data, validation_data, test_data = tfds.load(name="imdb_reviews",
+                                                   split=('train[:60%]', 'train[60%:]', 'test'),
+                                                   as_supervised=True)"""
+PATH='data/aclImdb/'
+names = ['neg','pos']
+
+def load_texts_labels_from_folders(path, folders):
+    texts,labels = [],[]
+    for idx,label in enumerate(folders):
+        for fname in glob(os.path.join(path, label, '*.*')):
+            texts.append(open(fname, 'r').read())
+            labels.append(idx)
+    return texts, np.array(labels).astype(np.int8)
+
+train,train_y = load_texts_labels_from_folders(f'{PATH}train',names)
+val,val_y = load_texts_labels_from_folders(f'{PATH}test',names)
+
+#len(train),len(train_y),len(val),len(val_y)
+
+#len(train_y[train_y==1]),len(val_y[val_y==1])
+
+#np.unique(train_y)
+
+#print(train[0])
+#print()
+#print(f"Review's label: {train_y[0]}")
+
+re_tok = re.compile(f'([{string.punctuation}“”¨«»®´·º½¾¿¡§£₤‘’])')
+def tokenize(s): return re_tok.sub(r' \1 ', s).split()
+
+vectorizer = sk.feature_extraction.text.CountVectorizer(tokenizer=tokenize)
+
+# Create same vocab for train and validation sets
+train_term_doc = vectorizer.fit_transform(train)
+val_term_doc = vectorizer.transform(val)
+
+vocab = vectorizer.get_feature_names()
+
+mnb = nb.MultinomialNB(alpha=0.8)
+cnb = nb.ComplementNB(alpha=0.84)
+lr = sk.linear_model.LogisticRegression(solver='lbfgs', max_iter=500, multi_class='multinomial')
+svm = sk.svm.LinearSVC(dual=False)
+dtr = sk.tree.DecisionTreeClassifier
+rfc = sk.ensemble.RandomForestClassifier
+ada = sk.ensemble.AdaBoostClassifier
+
+clf_list = [mnb, cnb, lr, svm, dtr, rfc, ada]
+clf_names = ['Multinomial Naive Bayes', 'Complement Naive Bayes', 'Logistic Regression', 'Support Vector Machine',
+             'Decision Tree', 'Random Forest', 'AdaBoost']
+
+fit_min_threshold(0, 0.25, 5, vectorizer, cnb, train, train_y, 5)
+X = get_vectors(vectorizer, train)
+Y = scipy.sparse.csr_matrix(train_y).transpose()
+dataset = scipy.sparse.hstack([X, Y], format="csr")
+dataset = sk.utils.shuffle(dataset)
+
+
+
+
+
+
+
+
+
+
 
 
 """ This concerns the dataset from my previous assignment, not relevant """

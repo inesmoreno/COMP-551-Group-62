@@ -325,6 +325,8 @@ dataset = sk.utils.shuffle(dataset)
 
 #compare_penalty_svm(svm, dataset)
 
+compare_classifiers(clf_list, clf_names, dataset)
+
 
 ### Final test
 """

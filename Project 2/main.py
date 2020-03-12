@@ -7,6 +7,8 @@ from nltk.tokenize import PunktSentenceTokenizer
 from nltk.corpus import stopwords
 import sklearn as sk
 import sklearn.naive_bayes as nb
+import sklearn.tree as sktree
+import sklearn.ensemble as skens
 import math
 import matplotlib.pyplot as plt
 import os, re, string
@@ -55,7 +57,7 @@ def preprocessing_stem(filename, stemmer):
 ##########################################################
 
 ### Feature extraction : transform each line into a vector of features
-def get_vectors(vectorizer, raw_X, frequency=True, downscale=False, fit=True):
+def get_vectors(vectorizer, raw_X, frequency=True, downscale=True, fit=True):
     # Create a vector of the number of occurence of each word
     if fit:
         X = vectorizer.fit_transform(raw_X)
@@ -156,6 +158,88 @@ def cross_validation(clf, dataset, k=5):
 ### Analysing the effect of preprocessing on the performance of the classifiers ###
 ###################################################################################
 
+def best_ngram(min_n, max_n, vectorizer, clf, raw_X, Y, k=5):
+    acc_list, ent_list = [], []
+    ngram_lst = []
+    sparse_Y = scipy.sparse.csr_matrix(Y).transpose()
+    for i in range(min_n, (max_n+1)):
+        for j in range(i, (max_n+1)):
+            vectorizer.set_params(ngram_range=(i, j))
+            ngram_lst.append('(' + str(i) + ', ' + str(j) + ')')
+            X = get_vectors(vectorizer, raw_X)
+            dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
+            acc, ent = cross_validation(clf, dataset, k)
+            acc_list.append(acc)
+            ent_list.append(ent)
+
+    plt.bar(ngram_lst, acc_list)
+    plt.ylabel('Accuracy')
+    plt.title('Accuracy in function of the ngram used')
+    plt.show()
+    plt.bar(ngram_lst, ent_list)
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Log Cross Entropy in function of the ngram used')
+    plt.show()
+
+### For a given classifier, compute the perfomance metrics depending on the stopwords list 
+def test_tokenizer(token_list, names_list, vectorizer, clf, raw_X, Y, k=5):
+    acc_list, ent_list = [], []
+    sparse_Y = scipy.sparse.csr_matrix(Y).transpose()
+    for t in token_list:
+        vectorizer.set_params(tokenizer=t)
+        X = get_vectors(vectorizer, raw_X)
+        dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
+        acc, ent = cross_validation(clf, dataset, k)
+        acc_list.append(acc)
+        ent_list.append(ent)
+
+    plt.bar(names_list, acc_list)
+    plt.ylabel('Accuracy')
+    plt.title('Accuracy in function of the tokenizer used')
+    plt.show()
+    plt.bar(names_list, ent_list)
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Log Cross Entropy in function of the tokenizer used')
+    plt.show()
+
+### For a given classifier, compare the performance depending on the method used to count the words
+def test_counting(vectorizer, clf, raw_X, Y, k=5):
+    names_list = ['Occurence', 'Frequency', 'Downscaled frequency']
+    acc_list, ent_list = [], []
+    sparse_Y = scipy.sparse.csr_matrix(Y).transpose()
+    
+    # Occurence counting
+    X = get_vectors(vectorizer, raw_X, frequency=False, downscale=False)
+    dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
+    acc, ent = cross_validation(clf, dataset, k)
+    acc_list.append(acc)
+    ent_list.append(ent)
+
+    # Frequency counting
+    X = get_vectors(vectorizer, raw_X, downscale=False)
+    dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
+    acc, ent = cross_validation(clf, dataset, k)
+    acc_list.append(acc)
+    ent_list.append(ent)
+
+    # Downscaled frequency counting
+    X = get_vectors(vectorizer, raw_X)
+    dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
+    acc, ent = cross_validation(clf, dataset, k)
+    acc_list.append(acc)
+    ent_list.append(ent)
+
+
+    plt.bar(names_list, acc_list)
+    plt.ylabel('Accuracy')
+    plt.title('Accuracy in function of the counting method')
+    plt.show()
+    plt.bar(names_list, ent_list)
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Log Cross Entropy in function of the counting method')
+    plt.show()
+
+
 ### For a given classifier, compute the perfomance metrics depending on min_df    
 """ This algorithm plot 'step' points of the average performance of a classifier 'clf' using k-fold cross validation when we vary the parameter 'min_df' from 'min_t' to 'max_t' """
 def fit_min_threshold(min_t, max_t, step, vectorizer, clf, raw_X, Y, k=5):
@@ -184,6 +268,36 @@ def fit_min_threshold(min_t, max_t, step, vectorizer, clf, raw_X, Y, k=5):
     plt.ylabel('Log Cross Entropy')
     plt.title('Log Cross Entropy in function of the minimum threshold')
     plt.show()
+    
+    return best_thresh
+
+### For a given classifier, compute the perfomance metrics depending on max_df
+def fit_max_threshold(min_t, max_t, step, vectorizer, clf, raw_X, Y, k=5):
+    thresholds = np.linspace(min_t, max_t, step)
+    acc_list, ent_list = [], []
+    best_acc, best_thresh = 0, min_t
+    sparse_Y = scipy.sparse.csr_matrix(Y).transpose()
+    for t in thresholds:
+        vectorizer.set_params(max_df=t)
+        X = get_vectors(vectorizer, raw_X)
+        dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
+        acc, ent = cross_validation(clf, dataset, k)
+        if acc > best_acc:
+            best_acc = acc
+            best_thresh = t
+        acc_list.append(acc)
+        ent_list.append(ent)
+
+    plt.plot(thresholds, acc_list, 'ro')
+    plt.xlabel('Maximum threshold')
+    plt.ylabel('Accuracy')
+    plt.title('Accuracy in function of the maximum threshold')
+    plt.show()
+    plt.plot(thresholds, ent_list, 'ro')
+    plt.xlabel('Maximum threshold')
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Log Cross Entropy in function of the maximum threshold')
+    plt.show()
 
     return best_thresh
 
@@ -197,6 +311,7 @@ def test_stopwords(stopwords_list, names_list, vectorizer, clf, raw_X, Y, k=5):
         X = get_vectors(vectorizer, raw_X)
         dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
         acc, ent = cross_validation(clf, dataset, k)
+        print(acc)
         acc_list.append(acc)
         ent_list.append(ent)
 
@@ -222,9 +337,9 @@ def test_stopwords(stopwords_list, names_list, vectorizer, clf, raw_X, Y, k=5):
 ### For a given naive bayes classifier, compute the perfomance metrics depending on the smoothing factor alpha 
 """ For numerical parameters """
 def fit_smoothing_nb(clf, dataset, step, k=5):
-    smooth_lst = np.linspace(1.0e-8, 1, step)    # The list of the values of the parameter that we will test. We vary the parameter from 0 to 1 testing 'step' values (i.e. 'step' is the number of points)
+    smooth_lst = np.linspace(1.0e-8, 1, step)    # The list of the values of the parameter that we will test. We vary the parameter from 1e-8 to 1 testing 'step' values (i.e. 'step' is the number of points)
     acc_list, ent_list = [], []     # Lists storing the results
-    best_acc, best_alpha = 0, 0
+    best_acc, best_alpha = 0, 1.0e-8
     for a in smooth_lst:
         clf.set_params(alpha=a)     # Set the parameter to the next value
         acc, ent = cross_validation(clf, dataset, k)      # Train the model, then evaluate its performance using cross validation
@@ -248,95 +363,181 @@ def fit_smoothing_nb(clf, dataset, step, k=5):
 
     return best_alpha
 
-def fit_smoothing_adaboost(clf, dataset, step, k=5):
-    smooth_lst = np.linspace(5, 100, step)  # The list of the values of the parameter that we will test. We vary the
-    # parameter from 0 to 1 testing 'step' values (i.e. 'step' is the number of points)
-    acc_list, ent_list = [], []  # Lists storing the results
-    best_acc, best_alpha = 0, 0
-    for a in smooth_lst:
-        clf.set_params(n_estimators=a)  # Set the parameter to the next value
-        acc, ent = cross_validation(clf, dataset,
-                                    k)  # Train the model, then evaluate its performance using cross validation
-        if acc > best_acc:
-            best_acc = acc
-            best_alpha = a
-        acc_list.append(acc)
-        ent_list.append(ent)
-
-    # Plot the results
-    plt.plot(smooth_lst, acc_list, 'ro')
-    plt.xlabel('Smoothing factor')
-    plt.ylabel('Accuracy')
-    plt.title('Adaboost (Accuracy depending on Smoothing Factor)')
-    plt.show()
-    plt.plot(smooth_lst, ent_list, 'ro')
-    plt.xlabel('Smoothing factor')
-    plt.ylabel('Log Cross Entropy')
-    plt.title('Adaboost (Log Cross Entropy depending on Smoothing Factor)')
-    plt.show()
-
-    return best_alpha
-
-
-def fit_smoothing_random_forest(clf, dataset, step, k=5):
-    smooth_lst = np.linspace(1, 100, step)  # The list of the values of the parameter that we will test. We vary the
-    # parameter from 0 to 1 testing 'step' values (i.e. 'step' is the number of points)
-    acc_list, ent_list = [], []  # Lists storing the results
-    best_acc, best_alpha = 0, 0
-    for a in smooth_lst:
-        clf.set_params(n_estimators=a)  # Set the parameter to the next value
-        acc, ent = cross_validation(clf, dataset,
-                                    k)  # Train the model, then evaluate its performance using cross validation
-        if acc > best_acc:
-            best_acc = acc
-            best_alpha = a
-        acc_list.append(acc)
-        ent_list.append(ent)
-
-    # Plot the results
-    plt.plot(smooth_lst, acc_list, 'ro')
-    plt.xlabel('Smoothing factor')
-    plt.ylabel('Accuracy')
-    plt.title('Random Forest (Accuracy depending on Smoothing Factor)')
-    plt.show()
-    plt.plot(smooth_lst, ent_list, 'ro')
-    plt.xlabel('Smoothing factor')
-    plt.ylabel('Log Cross Entropy')
-    plt.title('Random Forest (Log Cross Entropy depending on Smoothing Factor)')
-    plt.show()
-
-    return best_alpha
-
-def fit_smoothing_multinomial_nb(clf, dataset, step, k=5):
-    smooth_lst = np.linspace(1.0e-8, 1, step)    # The list of the values of the parameter that we will test. We vary the parameter from 0 to 1 testing 'step' values (i.e. 'step' is the number of points)
+# Can be used for logistic regression or support vector machine
+def fit_epsilon(min_eps, max_eps, clf, dataset, step, k=5):
+    eps_lst = np.linspace(min_eps, max_eps, step)    # The list of the values of the parameter that we will test.
     acc_list, ent_list = [], []     # Lists storing the results
-    best_acc, best_alpha = 0, 0
-    for a in smooth_lst:
-        clf.set_params(alpha=a)     # Set the parameter to the next value
+    best_acc, best_eps = 0, min_eps
+    for e in eps_lst:
+        clf.set_params(tol=e)     # Set the parameter to the next value
         acc, ent = cross_validation(clf, dataset, k)      # Train the model, then evaluate its performance using cross validation
         if acc > best_acc:
             best_acc = acc
-            best_alpha = a
+            best_eps = e
         acc_list.append(acc)
         ent_list.append(ent)
 
     # Plot the results
-    plt.plot(smooth_lst, acc_list, 'ro')
-    plt.xlabel('Smoothing factor')
+    plt.plot(eps_lst, acc_list, 'ro')
+    plt.xlabel('Tolerance for stopping criteria')
     plt.ylabel('Accuracy')
-    plt.title('Multinomial Naive Bayes (Accuracy depending on Smoothing Factor)')
+    plt.title('Support Vector Machine (Accuracy depending on the Tolerance for stopping criteria)')
     plt.show()
-    plt.plot(smooth_lst, ent_list, 'ro')
-    plt.xlabel('Smoothing factor')
+    plt.plot(eps_lst, ent_list, 'ro')
+    plt.xlabel('Tolerance for stopping criteria')
     plt.ylabel('Log Cross Entropy')
-    plt.title('Multinomial Naive Bayes (Log Cross Entropy depending on Smoothing Factor)')
+    plt.title('Support Vector Machine (Log Cross Entropy depending on the Tolerance for stopping criteria)')
     plt.show()
 
-    return best_alpha
+    return best_eps
+
+# Can be used for logistic regression or support vector machine
+def fit_iter(min_iter, max_iter, clf, dataset, step, k=5):
+    iter_lst = np.linspace(min_iter, max_iter, step)    # The list of the values of the parameter that we will test.
+    acc_list, ent_list = [], []     # Lists storing the results
+    best_acc, best_iter = 0, min_iter
+    for i in iter_lst:
+        clf.set_params(max_iter=i)     # Set the parameter to the next value
+        acc, ent = cross_validation(clf, dataset, k)      # Train the model, then evaluate its performance using cross validation
+        if acc > best_acc:
+            best_acc = acc
+            best_iter = i
+        acc_list.append(acc)
+        ent_list.append(ent)
+
+    # Plot the results
+    plt.plot(iter_lst, acc_list, 'ro')
+    plt.xlabel('Maximum number of iteration')
+    plt.ylabel('Accuracy')
+    plt.title('Support Vector Machine (Accuracy depending on the Maximum number of iteration)')
+    plt.show()
+    plt.plot(iter_lst, ent_list, 'ro')
+    plt.xlabel('Maximum number of iteration')
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Support Vector Machine (Log Cross Entropy depending on the Maximum number of iteration)')
+    plt.show()
+
+    return best_iter
+
+
+# Can be used for logistic regression or support vector machine
+def fit_regu(min_c, max_c, clf, dataset, step, k=5):
+    c_lst = np.linspace(min_c, max_c, step)    # The list of the values of the parameter that we will test.
+    acc_list, ent_list = [], []     # Lists storing the results
+    best_acc, best_c = 0, min_c
+    for c in c_lst:
+        clf.set_params(C=c)     # Set the parameter to the next value
+        acc, ent = cross_validation(clf, dataset, k)      # Train the model, then evaluate its performance using cross validation
+        if acc > best_acc:
+            best_acc = acc
+            best_c = c
+        acc_list.append(acc)
+        ent_list.append(ent)
+
+    # Plot the results
+    plt.plot(c_lst, acc_list, 'ro')
+    plt.xlabel('Inverse of regularisation strength')
+    plt.ylabel('Accuracy')
+    plt.title('Support Vector Machine (Accuracy depending on the Inverse of regularisation strength)')
+    plt.show()
+    plt.plot(c_lst, ent_list, 'ro')
+    plt.xlabel('Inverse of regularisation strength')
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Support Vector Machine (Log Cross Entropy depending on the Inverse of regularisation strength)')
+    plt.show()
+
+    return best_c
+
+
+def fit_number_adaboost(min_n, max_n, clf, dataset, step, k=5):
+    n_lst = np.linspace(min_n, max_n, step)  # The list of the values of the parameter that we will test.
+    acc_list, ent_list = [], []  # Lists storing the results
+    best_acc, best_n = 0, min_n
+    for n in n_lst:
+        print(n)
+        clf.set_params(n_estimators=math.floor(n))  # Set the parameter to the next value
+        acc, ent = cross_validation(clf, dataset, k)  # Train the model, then evaluate its performance using cross validation
+        if acc > best_acc:
+            best_acc = acc
+            best_n = math.floor(n)
+        acc_list.append(acc)
+        ent_list.append(ent)
+
+    # Plot the results
+    plt.plot(n_lst, acc_list, 'ro')
+    plt.xlabel('Number of estimators')
+    plt.ylabel('Accuracy')
+    plt.title('Adaboost (Accuracy depending on Number of estimators)')
+    plt.show()
+    plt.plot(n_lst, ent_list, 'ro')
+    plt.xlabel('Number of estimators')
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Adaboost (Log Cross Entropy depending on Number of estimators)')
+    plt.show()
+
+    return best_n
+
+def fit_learning_adaboost(min_lr, max_lr, clf, dataset, step, k=5):
+    lr_lst = np.linspace(min_lr, max_lr, step)  # The list of the values of the parameter that we will test.
+    acc_list, ent_list = [], []  # Lists storing the results
+    best_acc, best_lr = 0, min_lr
+    for l in lr_lst:
+        clf.set_params(learning_rate=l)  # Set the parameter to the next value
+        acc, ent = cross_validation(clf, dataset, k)  # Train the model, then evaluate its performance using cross validation
+        if acc > best_acc:
+            best_acc = acc
+            best_lr = l
+        acc_list.append(acc)
+        ent_list.append(ent)
+
+    # Plot the results
+    plt.plot(lr_lst, acc_list, 'ro')
+    plt.xlabel('Learning rate')
+    plt.ylabel('Accuracy')
+    plt.title('Adaboost (Accuracy depending on Learning rate)')
+    plt.show()
+    plt.plot(lr_lst, ent_list, 'ro')
+    plt.xlabel('Learning rate')
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Adaboost (Log Cross Entropy depending on Learning rate)')
+    plt.show()
+
+    return best_lr
+
+
+def fit_number_random_forest(min_n, max_n, clf, dataset, step, k=5):
+    n_lst = np.linspace(min_n, max_n, step)  # The list of the values of the parameter that we will test.
+    acc_list, ent_list = [], []  # Lists storing the results
+    best_acc, best_n = 0, min_n
+    for n in n_lst:
+        print(n)
+        clf.set_params(n_estimators=math.floor(n))  # Set the parameter to the next value
+        acc, ent = cross_validation(clf, dataset, k)  # Train the model, then evaluate its performance using cross validation
+        if acc > best_acc:
+            best_acc = acc
+            best_n = math.floor(n)
+        acc_list.append(acc)
+        ent_list.append(ent)
+
+    # Plot the results
+    plt.plot(n_lst, acc_list, 'ro')
+    plt.xlabel('Number of estimators')
+    plt.ylabel('Accuracy')
+    plt.title('Random Forest (Accuracy depending on Number of estimators)')
+    plt.show()
+    plt.plot(n_lst, ent_list, 'ro')
+    plt.xlabel('Number of estimators')
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Random Forest (Log Cross Entropy depending on Number of estimators)')
+    plt.show()
+
+    return best_n
+
 
 
 """" For discrete parameters """
 def compare_penalty_svm(clf, dataset, penalties=['l1', 'l2'], k=5):
+    clf.set_params(dual=False)
     acc_list, ent_list = [], []     # Lists storing the results
     for p in penalties:
         clf.set_params(penalty=p)     # Set the parameter to the next value
@@ -354,30 +555,31 @@ def compare_penalty_svm(clf, dataset, penalties=['l1', 'l2'], k=5):
     plt.title('Support Vector Machine (Log Cross Entropy in function of the penalty)')
     plt.show()
 
-def compare_criterion_logistic_regression(clf, dataset, criterions=['gini', 'entropy'], k=5):
+def compare_loss_svm(clf, dataset, losses=['hinge', 'squared_hinge'], k=5):
+    clf.set_params(dual=True)
     acc_list, ent_list = [], []     # Lists storing the results
-    for c in criterions:
-        clf.set_params(criterion=c)     # Set the parameter to the next value
+    for l in losses:
+        clf.set_params(loss=l)     # Set the parameter to the next value
         acc, ent = cross_validation(clf, dataset, k)      # Train the model, then evaluate its performance using cross validation
         acc_list.append(acc)
         ent_list.append(ent)
 
     # Plot the results
-    plt.bar(criterions, acc_list)
+    plt.bar(losses, acc_list)
     plt.ylabel('Accuracy')
-    plt.title('Logistic Regression (Accuracy in function of the criterion)')
+    plt.title('Support Vector Machine (Accuracy in function of the loss)')
     plt.show()
-    plt.bar(criterions, ent_list)
+    plt.bar(losses, ent_list)
     plt.ylabel('Log Cross Entropy')
-    plt.title('Logistic Regression (Log Cross Entropy in function of the criterion)')
+    plt.title('Support Vector Machine (Log Cross Entropy in function of the loss)')
     plt.show()
 
-def compare_criterion_decision_tree(clf, dataset, criterions=['gini', 'entropy'], k=5):
+# Can be used for decision tree and random forest
+def compare_criterion_tree(clf, dataset, criterions=['gini', 'entropy'], k=5):
     acc_list, ent_list = [], []  # Lists storing the results
     for c in criterions:
         clf.set_params(criterion=c)  # Set the parameter to the next value
-        acc, ent = cross_validation(clf, dataset,
-                                    k)  # Train the model, then evaluate its performance using cross validation
+        acc, ent = cross_validation(clf, dataset, k)  # Train the model, then evaluate its performance using cross validation
         acc_list.append(acc)
         ent_list.append(ent)
 
@@ -391,6 +593,24 @@ def compare_criterion_decision_tree(clf, dataset, criterions=['gini', 'entropy']
     plt.title('Decision Tree (Log Cross Entropy in function of the criterion)')
     plt.show()
 
+def compare_splitter_tree(clf, dataset, splits=['best', 'random'], k=5):
+    acc_list, ent_list = [], []  # Lists storing the results
+    for s in splits:
+        clf.set_params(splitter=s)  # Set the parameter to the next value
+        acc, ent = cross_validation(clf, dataset, k)  # Train the model, then evaluate its performance using cross validation
+        acc_list.append(acc)
+        ent_list.append(ent)
+
+    # Plot the results
+    plt.bar(splits, acc_list)
+    plt.ylabel('Accuracy')
+    plt.title('Decision Tree (Accuracy in function of the splitter)')
+    plt.show()
+    plt.bar(splits, ent_list)
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Decision Tree (Log Cross Entropy in function of the splitter)')
+    plt.show()
+
 ####################################################################################
 ### Analyze the performance of the different classifiers and choose the best one ###
 ####################################################################################
@@ -398,7 +618,10 @@ def compare_criterion_decision_tree(clf, dataset, criterions=['gini', 'entropy']
 ### Test different classifiers and compare their results
 def compare_classifiers(clf_list, clf_names, dataset, k=5):
     acc_list, ent_list = [], []
+    i = 0
     for c in clf_list:
+        print(clf_names[i])
+        i += 1
         acc, ent = cross_validation(c, dataset, k)
         acc_list.append(acc)
         ent_list.append(ent)
@@ -412,12 +635,36 @@ def compare_classifiers(clf_list, clf_names, dataset, k=5):
     plt.title('Log Cross Entropy of the different classifiers')
     plt.show()
 
+    return acc_list, ent_list
+
 ### Final Training / Testing
 def evaluate_model(clf, train_set, test_set):
     res = test_classifier(clf, train_set, test_set)
     mat = confusion_matrix(res, test_set[:, -1])
     print("Confusion Matrix : ", mat)
-    evaluate(mat, True)
+    return evaluate(mat, True)
+
+def final_evaluation(clf_list, train_set, test_set):
+    acc_list, ent_list = [], []
+    i = 0
+    for c in clf_list:
+        print(clf_names[i])
+        i += 1
+        acc, ent = evaluate_model(c, train_set, test_set)
+        acc_list.append(acc)
+        ent_list.append(ent)
+
+    plt.bar(clf_names, acc_list)
+    plt.ylabel('Accuracy')
+    plt.title('Accuracy of the different classifiers')
+    plt.show()
+    plt.bar(clf_names, ent_list)
+    plt.ylabel('Log Cross Entropy')
+    plt.title('Log Cross Entropy of the different classifiers')
+    plt.show()
+
+    return acc_list, ent_list
+
 
 
 
@@ -425,52 +672,108 @@ def evaluate_model(clf, train_set, test_set):
 ### Application to the datasets ###
 ###################################
 
-### 20 NEWS GROUP DATASET ###
-twenty_train = fetch_20newsgroups(subset='train', remove=(['headers', 'footers', 'quotes']))
-vectorizer_classic = sk.feature_extraction.text.CountVectorizer()
+## List of the classifiers
 
-sw_lst = [None, 'english', stopwords.words('english')]
-sw_names = ['None', 'Scikit.learn', 'NLTK']
-
-mnb = nb.MultinomialNB(alpha=0.8)
-cnb = nb.ComplementNB(alpha=0.84)
-lr = sk.linear_model.LogisticRegression(solver='lbfgs', max_iter=500, multi_class='multinomial')
-svm = sk.svm.LinearSVC(dual=False)
-dtr = sk.tree.DecisionTreeClassifier
-rfc = sk.ensemble.RandomForestClassifier
-ada = sk.ensemble.AdaBoostClassifier
+mnb = nb.MultinomialNB()
+cnb = nb.ComplementNB()
+lr = sk.linear_model.LogisticRegression(solver='lbfgs', multi_class='multinomial')
+svm = sk.svm.LinearSVC()
+dtr = sktree.DecisionTreeClassifier()
+rfc = skens.RandomForestClassifier()
+ada = skens.AdaBoostClassifier()
 
 clf_list = [mnb, cnb, lr, svm, dtr, rfc, ada]
 clf_names = ['Multinomial Naive Bayes', 'Complement Naive Bayes', 'Logistic Regression', 'Support Vector Machine',
              'Decision Tree', 'Random Forest', 'AdaBoost']
+
+## Preprocessing parameters
+
+max_thresh = 0.58
+min_thresh = 0
+
+def naive_tokenizer(s):
+    return s.split()
+
+re_tok = re.compile(f'([{string.punctuation}“”¨«»®´·º½¾¿¡§£₤‘’])')
+def symbol_tokenize(s): return re_tok.sub(r' \1 ', s).split()
+
+token_list = [None, naive_tokenizer, symbol_tokenize]
+token_names = ['Default', 'Naive', 'Symbol removal']
+
+sw_lst = [None, 'english', stopwords.words('english')]
+sw_names = ['None', 'Scikit.learn', 'NLTK']
+
+vectorizer = sk.feature_extraction.text.CountVectorizer(stop_words='english', max_df=max_thresh, min_df=min_thresh)
+
+
+### 20 NEWS GROUP DATASET ###
+twenty_train = fetch_20newsgroups(subset='train', remove=(['headers', 'footers', 'quotes']))
+
 ### Choose the preprocessing parameters
 
-#fit_min_threshold(0, 0.25, 5, vectorizer_classic, cnb, twenty_train.data[:600], twenty_train.target[:600], 5)
+#best_ngram(1, 2, vectorizer, cnb, twenty_train.data, twenty_train.target)
+#test_tokenizer(token_list, token_names, vectorizer, cnb, twenty_train.data, twenty_train.target)
+#test_counting(vectorizer, cnb, twenty_train.data, twenty_train.target)
+#print(fit_min_threshold(0, 0.15, 10, vectorizer, cnb, twenty_train.data, twenty_train.target, 5))
+#print(fit_max_threshold(0.5, 1, 20, vectorizer, cnb, twenty_train.data, twenty_train.target, 5))
+#test_stopwords(sw_lst, sw_names, vectorizer, cnb, twenty_train.data, twenty_train.target, 5)
 
 ### Find the hyperparameters of the classifier
 
-X = get_vectors(vectorizer_classic, twenty_train.data)
 
+X = get_vectors(vectorizer, twenty_train.data)
 Y = scipy.sparse.csr_matrix(twenty_train.target).transpose()
 dataset = scipy.sparse.hstack([X, Y], format="csr")
 dataset = sk.utils.shuffle(dataset)
 
-#compare_penalty_svm(svm, dataset)
+#print(fit_smoothing_nb(mnb, dataset, 20))
 
-compare_classifiers(clf_list, clf_names, dataset)
+#print(fit_smoothing_nb(cnb, dataset, 20))
+
+#print(fit_epsilon(1.e-4, 1.e-3, lr, dataset, 5))
+#fit_iter(300, 700, lr, dataset, 5)
+#print(fit_regu(0.1, 10, lr, dataset, 10))
+
+#print(fit_epsilon(1.e-4, 2.e-3, svm, dataset, 20))
+#fit_iter(800, 1500, svm, dataset, 8)
+#print(fit_regu(0.1, 2, svm, dataset, 10))
+#compare_penalty_svm(svm, dataset)
+#compare_loss_svm(svm, dataset)
+
+#compare_criterion_tree(dtr, dataset)
+#compare_splitter_tree(dtr, dataset)
+
+#compare_criterion_tree(rfc, dataset)
+#print(fit_number_random_forest(10, 50, ada, dataset, 5))
+
+#print(fit_number_adaboost(10, 50, ada, dataset, 5))
+#print(fit_learning_adaboost(0.75, 1.25, ada, dataset, 5))
+
+
+#print(compare_classifiers(clf_list, clf_names, dataset))
 
 
 ### Final test
-"""
+
+mnb = nb.MultinomialNB(alpha=0.05)
+cnb = nb.ComplementNB(alpha=0.315)
+lr = sk.linear_model.LogisticRegression(solver='lbfgs', tol=1e-3, C=3.4, max_iter=300, multi_class='multinomial')
+svm = sk.svm.LinearSVC(tol=1e-3, C=0.3)
+dtr = sktree.DecisionTreeClassifier()
+rfc = skens.RandomForestClassifier(n_estimators=30)
+ada = skens.AdaBoostClassifier(n_estimators=30, learning_rate=1.25)
+
+clf_list = [mnb, cnb, lr, svm, dtr, rfc, ada]
+clf_names = ['Multinomial Naive Bayes', 'Complement Naive Bayes', 'Logistic Regression', 'Support Vector Machine',
+             'Decision Tree', 'Random Forest', 'AdaBoost']
+
 twenty_test = fetch_20newsgroups(subset='test', remove=(['headers', 'footers', 'quotes']))
-X_test = get_vectors(vectorizer_classic, twenty_test.data, fit=False)
+X_test = get_vectors(vectorizer, twenty_test.data, fit=False)
 Y_test = scipy.sparse.csr_matrix(twenty_test.target).transpose()
 test_set = scipy.sparse.hstack([X_test, Y_test], format="csr")
-print(dataset.shape)
-print(test_set.shape)
 
-evaluate_model(cnb, dataset, test_set)
-"""
+final_evaluation(clf_list, dataset, test_set)
+
 
 ### IMDB DATASET ###
 
@@ -488,8 +791,10 @@ def load_texts_labels_from_folders(path, folders):
             labels.append(idx)
     return texts, np.array(labels).astype(np.int8)
 
-train,train_y = load_texts_labels_from_folders(f'{PATH}train',names)
-val,val_y = load_texts_labels_from_folders(f'{PATH}test',names)
+train, train_y = load_texts_labels_from_folders(f'{PATH}train',names)
+val, val_y = load_texts_labels_from_folders(f'{PATH}test',names)
+
+print(train)
 
 #len(train),len(train_y),len(val),len(val_y)
 
@@ -501,36 +806,30 @@ val,val_y = load_texts_labels_from_folders(f'{PATH}test',names)
 #print()
 #print(f"Review's label: {train_y[0]}")
 
-re_tok = re.compile(f'([{string.punctuation}“”¨«»®´·º½¾¿¡§£₤‘’])')
-def tokenize(s): return re_tok.sub(r' \1 ', s).split()
-
-vectorizer = sk.feature_extraction.text.CountVectorizer(tokenizer=tokenize)
-
+"""
 # Create same vocab for train and validation sets
 train_term_doc = vectorizer.fit_transform(train)
 val_term_doc = vectorizer.transform(val)
-
-vocab = vectorizer.get_feature_names()
-
-mnb = nb.MultinomialNB(alpha=0.8)
-cnb = nb.ComplementNB(alpha=0.84)
-lr = sk.linear_model.LogisticRegression(solver='lbfgs', max_iter=500, multi_class='multinomial')
-svm = sk.svm.LinearSVC(dual=False)
-dtr = sk.tree.DecisionTreeClassifier
-rfc = sk.ensemble.RandomForestClassifier
-ada = sk.ensemble.AdaBoostClassifier
-
-clf_list = [mnb, cnb, lr, svm, dtr, rfc, ada]
-clf_names = ['Multinomial Naive Bayes', 'Complement Naive Bayes', 'Logistic Regression', 'Support Vector Machine',
-             'Decision Tree', 'Random Forest', 'AdaBoost']
-
+"""
+"""
 fit_min_threshold(0, 0.25, 5, vectorizer, cnb, train, train_y, 5)
+
 X = get_vectors(vectorizer, train)
 Y = scipy.sparse.csr_matrix(train_y).transpose()
 dataset = scipy.sparse.hstack([X, Y], format="csr")
 dataset = sk.utils.shuffle(dataset)
 
+compare_classifiers(clf_list, clf_names, dataset)
+"""
 
+### Final test
+"""
+X_test = get_vectors(vectorizer, val, fit=False)
+Y_test = scipy.sparse.csr_matrix(val_y).transpose()
+test_set = scipy.sparse.hstack([X_test, Y_test], format="csr")
+
+evaluate_model(cnb, dataset, test_set)
+"""
 
 
 

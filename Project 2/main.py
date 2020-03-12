@@ -16,9 +16,10 @@ import os, re, string
 # Get the data
 from sklearn.datasets import fetch_20newsgroups
 os.system("wget http://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz")
+
 #os.system('powershell -command Invoke-WebRequest " http://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz" -OutFile "aclImdb_v1.tar.gz"')
-os.system("gunzip aclImdb_v1.tar.gz")
-os.system("tar -xvf aclImdb_v1.tar")
+os.system("gzip -d aclImdb_v1.tar.gz")
+os.system("tar -xf aclImdb_v1.tar")
 
 
 
@@ -27,13 +28,6 @@ os.system("tar -xvf aclImdb_v1.tar")
 """
 To do list :
 - Get the actual databases that we want to work on, and get the results on these databases  --> First one Ok
-- Adjust a few things in the preprocessing part (use frequencies and sparse matrices)       --> Ok
-- Change the evaluations metrics to fit classification (multiple classes)                   --> Ok
-- /!\ Add the missing classifiers to the list of classifiers that we want to test
-- /!\ Add tests for other hyperparameters
-- Add something to select the hyperparameters                                               --> Ok
-- Add some sort of validation test (cross-validation most likely)                           --> Ok
-- Adjust the tests for the best preprocessing parameters                                    --> Must check the format of the other dataset + stemmer
 - Create a global test that automatically fit the parameters                                --> Maybe, kinda bothersome since we have to do one for each classifiers and the running time is quite long
 """
 
@@ -759,7 +753,7 @@ dataset = sk.utils.shuffle(dataset)
 """
 mnb = nb.MultinomialNB(alpha=0.05)
 cnb = nb.ComplementNB(alpha=0.315)
-lr = sk.linear_model.LogisticRegression(solver='lbfgs', tol=1e-3, C=3.4, max_iter=300, multi_class='multinomial')
+lr = sk.linear_model.LogisticRegression(solver='lbfgs', tol=1e-3, C=6.7, max_iter=300, multi_class='multinomial')
 svm = sk.svm.LinearSVC(tol=1e-3, C=0.3)
 dtr = sktree.DecisionTreeClassifier()
 rfc = skens.RandomForestClassifier(n_estimators=30)
@@ -796,7 +790,6 @@ def load_texts_labels_from_folders(path, folders):
 train, train_y = load_texts_labels_from_folders(f'{PATH}train',names)
 val, val_y = load_texts_labels_from_folders(f'{PATH}test',names)
 
-print(train)
 
 #len(train),len(train_y),len(val),len(val_y)
 
@@ -813,9 +806,8 @@ print(train)
 #train_term_doc = vectorizer.fit_transform(train)
 #val_term_doc = vectorizer.transform(val)
 
-
-max_thresh = 0.9
-min_thresh = 1e-4
+max_thresh = 0.99
+min_thresh = 0
 
 vectorizer = sk.feature_extraction.text.CountVectorizer(min_df=min_thresh, max_df=max_thresh)
 

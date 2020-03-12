@@ -16,6 +16,7 @@ import os, re, string
 # Get the data
 from sklearn.datasets import fetch_20newsgroups
 os.system("wget http://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz")
+#os.system('powershell -command Invoke-WebRequest " http://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz" -OutFile "aclImdb_v1.tar.gz"')
 os.system("gunzip aclImdb_v1.tar.gz")
 os.system("tar -xvf aclImdb_v1.tar")
 
@@ -381,12 +382,12 @@ def fit_epsilon(min_eps, max_eps, clf, dataset, step, k=5):
     plt.plot(eps_lst, acc_list, 'ro')
     plt.xlabel('Tolerance for stopping criteria')
     plt.ylabel('Accuracy')
-    plt.title('Support Vector Machine (Accuracy depending on the Tolerance for stopping criteria)')
+    plt.title('Logistic Regression (Accuracy depending on the Tolerance for stopping criteria)')
     plt.show()
     plt.plot(eps_lst, ent_list, 'ro')
     plt.xlabel('Tolerance for stopping criteria')
     plt.ylabel('Log Cross Entropy')
-    plt.title('Support Vector Machine (Log Cross Entropy depending on the Tolerance for stopping criteria)')
+    plt.title('Logistic Regression (Log Cross Entropy depending on the Tolerance for stopping criteria)')
     plt.show()
 
     return best_eps
@@ -409,12 +410,12 @@ def fit_iter(min_iter, max_iter, clf, dataset, step, k=5):
     plt.plot(iter_lst, acc_list, 'ro')
     plt.xlabel('Maximum number of iteration')
     plt.ylabel('Accuracy')
-    plt.title('Support Vector Machine (Accuracy depending on the Maximum number of iteration)')
+    plt.title('Logistic Regression (Accuracy depending on the Maximum number of iteration)')
     plt.show()
     plt.plot(iter_lst, ent_list, 'ro')
     plt.xlabel('Maximum number of iteration')
     plt.ylabel('Log Cross Entropy')
-    plt.title('Support Vector Machine (Log Cross Entropy depending on the Maximum number of iteration)')
+    plt.title('Logistic Regression (Log Cross Entropy depending on the Maximum number of iteration)')
     plt.show()
 
     return best_iter
@@ -438,12 +439,12 @@ def fit_regu(min_c, max_c, clf, dataset, step, k=5):
     plt.plot(c_lst, acc_list, 'ro')
     plt.xlabel('Inverse of regularisation strength')
     plt.ylabel('Accuracy')
-    plt.title('Support Vector Machine (Accuracy depending on the Inverse of regularisation strength)')
+    plt.title('Logistic Regression (Accuracy depending on the Inverse of regularisation strength)')
     plt.show()
     plt.plot(c_lst, ent_list, 'ro')
     plt.xlabel('Inverse of regularisation strength')
     plt.ylabel('Log Cross Entropy')
-    plt.title('Support Vector Machine (Log Cross Entropy depending on the Inverse of regularisation strength)')
+    plt.title('Logistic Regression (Log Cross Entropy depending on the Inverse of regularisation strength)')
     plt.show()
 
     return best_c
@@ -586,11 +587,11 @@ def compare_criterion_tree(clf, dataset, criterions=['gini', 'entropy'], k=5):
     # Plot the results
     plt.bar(criterions, acc_list)
     plt.ylabel('Accuracy')
-    plt.title('Decision Tree (Accuracy in function of the criterion)')
+    plt.title('Random Forest (Accuracy in function of the criterion)')
     plt.show()
     plt.bar(criterions, ent_list)
     plt.ylabel('Log Cross Entropy')
-    plt.title('Decision Tree (Log Cross Entropy in function of the criterion)')
+    plt.title('Random Forest (Log Cross Entropy in function of the criterion)')
     plt.show()
 
 def compare_splitter_tree(clf, dataset, splits=['best', 'random'], k=5):
@@ -675,8 +676,8 @@ def final_evaluation(clf_list, train_set, test_set):
 ## List of the classifiers
 
 mnb = nb.MultinomialNB()
-cnb = nb.ComplementNB()
-lr = sk.linear_model.LogisticRegression(solver='lbfgs', multi_class='multinomial')
+cnb = nb.ComplementNB(alpha=0.315)
+lr = sk.linear_model.LogisticRegression(solver='lbfgs', max_iter=300, multi_class='multinomial')
 svm = sk.svm.LinearSVC()
 dtr = sktree.DecisionTreeClassifier()
 rfc = skens.RandomForestClassifier()
@@ -688,8 +689,8 @@ clf_names = ['Multinomial Naive Bayes', 'Complement Naive Bayes', 'Logistic Regr
 
 ## Preprocessing parameters
 
-max_thresh = 0.58
-min_thresh = 0
+max_thresh = 0.9
+min_thresh = 1e-4
 
 def naive_tokenizer(s):
     return s.split()
@@ -707,31 +708,32 @@ vectorizer = sk.feature_extraction.text.CountVectorizer(stop_words='english', ma
 
 
 ### 20 NEWS GROUP DATASET ###
+"""
 twenty_train = fetch_20newsgroups(subset='train', remove=(['headers', 'footers', 'quotes']))
-
+"""
 ### Choose the preprocessing parameters
 
 #best_ngram(1, 2, vectorizer, cnb, twenty_train.data, twenty_train.target)
 #test_tokenizer(token_list, token_names, vectorizer, cnb, twenty_train.data, twenty_train.target)
 #test_counting(vectorizer, cnb, twenty_train.data, twenty_train.target)
-#print(fit_min_threshold(0, 0.15, 10, vectorizer, cnb, twenty_train.data, twenty_train.target, 5))
+#print(fit_min_threshold(0, 0.001, 10, vectorizer, cnb, twenty_train.data, twenty_train.target, 5))
 #print(fit_max_threshold(0.5, 1, 20, vectorizer, cnb, twenty_train.data, twenty_train.target, 5))
 #test_stopwords(sw_lst, sw_names, vectorizer, cnb, twenty_train.data, twenty_train.target, 5)
 
 ### Find the hyperparameters of the classifier
 
-
+"""
 X = get_vectors(vectorizer, twenty_train.data)
 Y = scipy.sparse.csr_matrix(twenty_train.target).transpose()
 dataset = scipy.sparse.hstack([X, Y], format="csr")
 dataset = sk.utils.shuffle(dataset)
-
+"""
 #print(fit_smoothing_nb(mnb, dataset, 20))
 
 #print(fit_smoothing_nb(cnb, dataset, 20))
 
 #print(fit_epsilon(1.e-4, 1.e-3, lr, dataset, 5))
-#fit_iter(300, 700, lr, dataset, 5)
+#fit_iter(300, 700, lr, dataset, 3)
 #print(fit_regu(0.1, 10, lr, dataset, 10))
 
 #print(fit_epsilon(1.e-4, 2.e-3, svm, dataset, 20))
@@ -754,7 +756,7 @@ dataset = sk.utils.shuffle(dataset)
 
 
 ### Final test
-
+"""
 mnb = nb.MultinomialNB(alpha=0.05)
 cnb = nb.ComplementNB(alpha=0.315)
 lr = sk.linear_model.LogisticRegression(solver='lbfgs', tol=1e-3, C=3.4, max_iter=300, multi_class='multinomial')
@@ -771,8 +773,8 @@ twenty_test = fetch_20newsgroups(subset='test', remove=(['headers', 'footers', '
 X_test = get_vectors(vectorizer, twenty_test.data, fit=False)
 Y_test = scipy.sparse.csr_matrix(twenty_test.target).transpose()
 test_set = scipy.sparse.hstack([X_test, Y_test], format="csr")
-
-final_evaluation(clf_list, dataset, test_set)
+"""
+#print(final_evaluation(clf_list, dataset, test_set))
 
 
 ### IMDB DATASET ###
@@ -806,21 +808,64 @@ print(train)
 #print()
 #print(f"Review's label: {train_y[0]}")
 
-"""
-# Create same vocab for train and validation sets
-train_term_doc = vectorizer.fit_transform(train)
-val_term_doc = vectorizer.transform(val)
-"""
-"""
-fit_min_threshold(0, 0.25, 5, vectorizer, cnb, train, train_y, 5)
 
+# Create same vocab for train and validation sets
+#train_term_doc = vectorizer.fit_transform(train)
+#val_term_doc = vectorizer.transform(val)
+
+
+max_thresh = 0.9
+min_thresh = 1e-4
+
+vectorizer = sk.feature_extraction.text.CountVectorizer(min_df=min_thresh, max_df=max_thresh)
+
+### Choose the preprocessing parameters
+
+best_ngram(1, 2, vectorizer, cnb, train, train_y)
+vectorizer.set_params(ngram_range=(1, 1))
+test_tokenizer(token_list, token_names, vectorizer, cnb, train, train_y)
+vectorizer.set_params(tokenizer=None)
+test_counting(vectorizer, cnb, train, train_y)
+print(fit_min_threshold(0, 0.15, 10, vectorizer, cnb, train, train_y, 5))
+vectorizer.set_params(min_df=min_thresh)
+print(fit_max_threshold(0.5, 0.75, 20, vectorizer, cnb, train, train_y, 5))
+vectorizer.set_params(min_df=max_thresh)
+test_stopwords(sw_lst, sw_names, vectorizer, cnb, train, train_y.target, 5)
+
+"""
 X = get_vectors(vectorizer, train)
 Y = scipy.sparse.csr_matrix(train_y).transpose()
 dataset = scipy.sparse.hstack([X, Y], format="csr")
 dataset = sk.utils.shuffle(dataset)
 
-compare_classifiers(clf_list, clf_names, dataset)
 """
+### Find the hyperparameters of the classifier
+
+#print(fit_smoothing_nb(mnb, dataset, 20))
+
+#print(fit_smoothing_nb(cnb, dataset, 20))
+
+#print(fit_epsilon(1.e-4, 1.e-3, lr, dataset, 5))
+#fit_iter(300, 700, lr, dataset, 5)
+#print(fit_regu(0.1, 10, lr, dataset, 10))
+
+#print(fit_epsilon(1.e-4, 2.e-3, svm, dataset, 20))
+#fit_iter(800, 1500, svm, dataset, 8)
+#print(fit_regu(0.1, 2, svm, dataset, 10))
+#compare_penalty_svm(svm, dataset)
+#compare_loss_svm(svm, dataset)
+
+#compare_criterion_tree(dtr, dataset)
+#compare_splitter_tree(dtr, dataset)
+
+#compare_criterion_tree(rfc, dataset)
+#print(fit_number_random_forest(10, 50, ada, dataset, 5))
+
+#print(fit_number_adaboost(10, 50, ada, dataset, 5))
+#print(fit_learning_adaboost(0.75, 1.25, ada, dataset, 5))
+
+
+#print(compare_classifiers(clf_list, clf_names, dataset))
 
 ### Final test
 """
@@ -845,23 +890,9 @@ evaluate_model(cnb, dataset, test_set)
 
 """
 #######################
-# Definition of the classifiers and the tools used for preprocessing
-def naive_tokenizer(s):
-    return s.split()
+
 
 ps = PorterStemmer()
-#######################
-
-
-neg_X = preprocessing_stem('.\\rt-polaritydata\\rt-polaritydata\\rt-polarity.neg', ps)
-pos_X = preprocessing_stem('.\\rt-polaritydata\\rt-polaritydata\\rt-polarity.pos', ps)
-raw_X = neg_X + pos_X
 
 pst = PunktSentenceTokenizer(raw_X)
-
-######################
-
-svm1 = sk.svm.LinearSVC(penalty='l2', loss='hinge', max_iter=2000)
-svm2 = sk.svm.LinearSVC(loss='squared_hinge', max_iter=2000)
-svm3 = sk.svm.LinearSVC(dual=False, max_iter=2000)
 """

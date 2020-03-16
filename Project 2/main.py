@@ -12,40 +12,15 @@ import sklearn.ensemble as skens
 import math
 import matplotlib.pyplot as plt
 import os, re, string
+from sklearn.pipeline import Pipeline
+from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.model_selection import GridSearchCV
 
 # Get the data
 from sklearn.datasets import fetch_20newsgroups
-os.system("wget http://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz")
-
-#os.system('powershell -command Invoke-WebRequest " http://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz" -OutFile "aclImdb_v1.tar.gz"')
-os.system("gzip -d aclImdb_v1.tar.gz")
-os.system("tar -xf aclImdb_v1.tar")
-
-
 
 #nltk.download()
 
-"""
-To do list :
-- Get the actual databases that we want to work on, and get the results on these databases  --> First one Ok
-- Create a global test that automatically fit the parameters                                --> Maybe, kinda bothersome since we have to do one for each classifiers and the running time is quite long
-"""
-
-############################################################################
-### Bonus part : preprocessing of the text to get more relevant features ###
-############################################################################
-""" Not adapted right not, might delete later """
-### Text processing : apply stemmers/lemmatizers on the text and separate each line
-
-def preprocessing_stem(filename, stemmer):
-    file = open(filename, "r")
-    X = []
-    for l in file:
-        stemmed = ''
-        for w in l:
-            stemmed += stemmer.stem(w)
-        X.append(stemmed)
-    return X
 
 ##########################################################
 ### Transforming the text into vectors + preprocessing ###
@@ -82,8 +57,11 @@ def test_classifier(clf, train_set, test_set):
 ##################################################
 
 # Count the number of true positive, true negative, false positive and false negative
-def confusion_matrix(predicted, labels):
-    correct = np.ravel(labels.toarray())
+def confusion_matrix(predicted, labels, sparse=True):
+    if sparse:
+        correct = np.ravel(labels.toarray())
+    else:
+        correct = labels
     classes = np.unique(correct)        # List the different labels found in the testing set
     conf_mat = np.zeros((len(classes), len(classes)))       # Count the number of sample that was predicted to be labelled i with actual label j
     for i in range(len(predicted)):
@@ -206,6 +184,7 @@ def test_counting(vectorizer, clf, raw_X, Y, k=5):
     # Occurence counting
     X = get_vectors(vectorizer, raw_X, frequency=False, downscale=False)
     dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
+    dataset = sk.utils.shuffle(dataset)
     acc, ent = cross_validation(clf, dataset, k)
     acc_list.append(acc)
     ent_list.append(ent)
@@ -213,6 +192,7 @@ def test_counting(vectorizer, clf, raw_X, Y, k=5):
     # Frequency counting
     X = get_vectors(vectorizer, raw_X, downscale=False)
     dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
+    dataset = sk.utils.shuffle(dataset)
     acc, ent = cross_validation(clf, dataset, k)
     acc_list.append(acc)
     ent_list.append(ent)
@@ -220,6 +200,7 @@ def test_counting(vectorizer, clf, raw_X, Y, k=5):
     # Downscaled frequency counting
     X = get_vectors(vectorizer, raw_X)
     dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
+    dataset = sk.utils.shuffle(dataset)
     acc, ent = cross_validation(clf, dataset, k)
     acc_list.append(acc)
     ent_list.append(ent)
@@ -236,7 +217,6 @@ def test_counting(vectorizer, clf, raw_X, Y, k=5):
 
 
 ### For a given classifier, compute the perfomance metrics depending on min_df    
-""" This algorithm plot 'step' points of the average performance of a classifier 'clf' using k-fold cross validation when we vary the parameter 'min_df' from 'min_t' to 'max_t' """
 def fit_min_threshold(min_t, max_t, step, vectorizer, clf, raw_X, Y, k=5):
     thresholds = np.linspace(min_t, max_t, step)
     acc_list, ent_list = [], []
@@ -246,6 +226,7 @@ def fit_min_threshold(min_t, max_t, step, vectorizer, clf, raw_X, Y, k=5):
         vectorizer.set_params(min_df=t)
         X = get_vectors(vectorizer, raw_X)
         dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
+        dataset = sk.utils.shuffle(dataset)
         acc, ent = cross_validation(clf, dataset, k)
         if acc > best_acc:
             best_acc = acc
@@ -276,6 +257,7 @@ def fit_max_threshold(min_t, max_t, step, vectorizer, clf, raw_X, Y, k=5):
         vectorizer.set_params(max_df=t)
         X = get_vectors(vectorizer, raw_X)
         dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
+        dataset = sk.utils.shuffle(dataset)
         acc, ent = cross_validation(clf, dataset, k)
         if acc > best_acc:
             best_acc = acc
@@ -305,6 +287,7 @@ def test_stopwords(stopwords_list, names_list, vectorizer, clf, raw_X, Y, k=5):
         vectorizer.set_params(stop_words=s)
         X = get_vectors(vectorizer, raw_X)
         dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
+        dataset = sk.utils.shuffle(dataset)
         acc, ent = cross_validation(clf, dataset, k)
         print(acc)
         acc_list.append(acc)
@@ -324,13 +307,7 @@ def test_stopwords(stopwords_list, names_list, vectorizer, clf, raw_X, Y, k=5):
 ### Analysing the effect of the hyperparameters on the performance of the classifiers ###
 #########################################################################################
 
-""" /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ """
-""" This is the part we want to copy paste to create new test. Tell me if something is unclear there    """
-""" We most likely also want to add something so that the algorithm return the best hyperparameter      """
-""" /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ /!\ """
-
-### For a given naive bayes classifier, compute the perfomance metrics depending on the smoothing factor alpha 
-""" For numerical parameters """
+### For a given naive bayes classifier, compute the perfomance metrics depending on the smoothing factor alpha
 def fit_smoothing_nb(clf, dataset, step, k=5):
     smooth_lst = np.linspace(1.0e-8, 1, step)    # The list of the values of the parameter that we will test. We vary the parameter from 1e-8 to 1 testing 'step' values (i.e. 'step' is the number of points)
     acc_list, ent_list = [], []     # Lists storing the results
@@ -530,7 +507,7 @@ def fit_number_random_forest(min_n, max_n, clf, dataset, step, k=5):
 
 
 
-"""" For discrete parameters """
+
 def compare_penalty_svm(clf, dataset, penalties=['l1', 'l2'], k=5):
     clf.set_params(dual=False)
     acc_list, ent_list = [], []     # Lists storing the results
@@ -692,8 +669,10 @@ def naive_tokenizer(s):
 re_tok = re.compile(f'([{string.punctuation}“”¨«»®´·º½¾¿¡§£₤‘’])')
 def symbol_tokenize(s): return re_tok.sub(r' \1 ', s).split()
 
-token_list = [None, naive_tokenizer, symbol_tokenize]
-token_names = ['Default', 'Naive', 'Symbol removal']
+pst = PunktSentenceTokenizer()
+
+token_list = [None, naive_tokenizer, symbol_tokenize, pst]
+token_names = ['Default', 'Naive', 'Symbol removal', 'PunktSentenceTokenizer']
 
 sw_lst = [None, 'english', stopwords.words('english')]
 sw_names = ['None', 'Scikit.learn', 'NLTK']
@@ -704,53 +683,60 @@ vectorizer = sk.feature_extraction.text.CountVectorizer(stop_words='english', ma
 ### 20 NEWS GROUP DATASET ###
 """
 twenty_train = fetch_20newsgroups(subset='train', remove=(['headers', 'footers', 'quotes']))
-"""
+
+classes, occ = np.unique(twenty_train.target, return_counts=True)
+
+plt.barh(twenty_train.target_names, occ)
+plt.ylabel('Number of occurences')
+plt.title('Distribution of the different classes')
+plt.show()
+
 ### Choose the preprocessing parameters
 
-#best_ngram(1, 2, vectorizer, cnb, twenty_train.data, twenty_train.target)
-#test_tokenizer(token_list, token_names, vectorizer, cnb, twenty_train.data, twenty_train.target)
-#test_counting(vectorizer, cnb, twenty_train.data, twenty_train.target)
-#print(fit_min_threshold(0, 0.001, 10, vectorizer, cnb, twenty_train.data, twenty_train.target, 5))
-#print(fit_max_threshold(0.5, 1, 20, vectorizer, cnb, twenty_train.data, twenty_train.target, 5))
-#test_stopwords(sw_lst, sw_names, vectorizer, cnb, twenty_train.data, twenty_train.target, 5)
+best_ngram(1, 2, vectorizer, cnb, twenty_train.data, twenty_train.target)
+test_tokenizer(token_list, token_names, vectorizer, cnb, twenty_train.data, twenty_train.target)
+test_counting(vectorizer, cnb, twenty_train.data, twenty_train.target)
+print(fit_min_threshold(0, 0.001, 10, vectorizer, cnb, twenty_train.data, twenty_train.target, 5))
+print(fit_max_threshold(0.5, 1, 20, vectorizer, cnb, twenty_train.data, twenty_train.target, 5))
+test_stopwords(sw_lst, sw_names, vectorizer, cnb, twenty_train.data, twenty_train.target, 5)
 
 ### Find the hyperparameters of the classifier
 
-"""
+
 X = get_vectors(vectorizer, twenty_train.data)
 Y = scipy.sparse.csr_matrix(twenty_train.target).transpose()
 dataset = scipy.sparse.hstack([X, Y], format="csr")
 dataset = sk.utils.shuffle(dataset)
-"""
-#print(fit_smoothing_nb(mnb, dataset, 20))
 
-#print(fit_smoothing_nb(cnb, dataset, 20))
+print(fit_smoothing_nb(mnb, dataset, 20))
 
-#print(fit_epsilon(1.e-4, 1.e-3, lr, dataset, 5))
-#fit_iter(300, 700, lr, dataset, 3)
-#print(fit_regu(0.1, 10, lr, dataset, 10))
+print(fit_smoothing_nb(cnb, dataset, 20))
 
-#print(fit_epsilon(1.e-4, 2.e-3, svm, dataset, 20))
-#fit_iter(800, 1500, svm, dataset, 8)
-#print(fit_regu(0.1, 2, svm, dataset, 10))
-#compare_penalty_svm(svm, dataset)
-#compare_loss_svm(svm, dataset)
+print(fit_epsilon(1.e-4, 1.e-3, lr, dataset, 5))
+fit_iter(300, 700, lr, dataset, 3)
+print(fit_regu(0.1, 10, lr, dataset, 10))
 
-#compare_criterion_tree(dtr, dataset)
-#compare_splitter_tree(dtr, dataset)
+print(fit_epsilon(1.e-4, 2.e-3, svm, dataset, 20))
+fit_iter(800, 1500, svm, dataset, 8)
+print(fit_regu(0.1, 2, svm, dataset, 10))
+compare_penalty_svm(svm, dataset)
+compare_loss_svm(svm, dataset)
 
-#compare_criterion_tree(rfc, dataset)
-#print(fit_number_random_forest(10, 50, ada, dataset, 5))
+compare_criterion_tree(dtr, dataset)
+compare_splitter_tree(dtr, dataset)
 
-#print(fit_number_adaboost(10, 50, ada, dataset, 5))
-#print(fit_learning_adaboost(0.75, 1.25, ada, dataset, 5))
+compare_criterion_tree(rfc, dataset)
+print(fit_number_random_forest(10, 50, ada, dataset, 5))
+
+print(fit_number_adaboost(10, 50, ada, dataset, 5))
+print(fit_learning_adaboost(0.75, 1.25, ada, dataset, 5))
 
 
-#print(compare_classifiers(clf_list, clf_names, dataset))
+print(compare_classifiers(clf_list, clf_names, dataset))
 
 
 ### Final test
-"""
+
 mnb = nb.MultinomialNB(alpha=0.05)
 cnb = nb.ComplementNB(alpha=0.315)
 lr = sk.linear_model.LogisticRegression(solver='lbfgs', tol=1e-3, C=6.7, max_iter=300, multi_class='multinomial')
@@ -764,47 +750,52 @@ clf_names = ['Multinomial Naive Bayes', 'Complement Naive Bayes', 'Logistic Regr
              'Decision Tree', 'Random Forest', 'AdaBoost']
 
 twenty_test = fetch_20newsgroups(subset='test', remove=(['headers', 'footers', 'quotes']))
+
 X_test = get_vectors(vectorizer, twenty_test.data, fit=False)
 Y_test = scipy.sparse.csr_matrix(twenty_test.target).transpose()
 test_set = scipy.sparse.hstack([X_test, Y_test], format="csr")
+
+print(final_evaluation(clf_list, dataset, test_set))
+
+### Optimize the best classifier
+
+text_mnb = Pipeline([('vect', vectorizer), ('tfidf', TfidfTransformer()), ('clf', mnb)])
+
+params = {'vect__ngram_range': [(1, 1), (2, 2)], 'vect__stop_words': [None, 'english', stopwords.words('english')], 'vect__min_df': [0, 5e-5, 1e-4] ,'tfidf__use_idf': (True, False), 'clf__alpha': [1, 0.8, 0.6, 0.4, 0.3, 0.2], 'clf__fit_prior': (True, False)}
+
+gs_mnb = GridSearchCV(text_mnb, params, cv=5, n_jobs=-1)
+gs_mnb = gs_mnb.fit(twenty_train.data, twenty_train.target)
+
+for param_name in sorted(params.keys()):
+    print("%s: %r" % (param_name, gs_mnb.best_params_[param_name]))
+
+res = gs_mnb.predict(twenty_test.data)
+mat = confusion_matrix(res, twenty_test.target, False)
+evaluate(mat, True)
 """
-#print(final_evaluation(clf_list, dataset, test_set))
-
-
 ### IMDB DATASET ###
 
-"""train_data, validation_data, test_data = tfds.load(name="imdb_reviews",
-                                                   split=('train[:60%]', 'train[60%:]', 'test'),
-                                                   as_supervised=True)"""
-PATH='data/aclImdb/'
-names = ['neg','pos']
+ps = PorterStemmer()
 
-def load_texts_labels_from_folders(path, folders):
-    texts,labels = [],[]
-    for idx,label in enumerate(folders):
-        for fname in glob(os.path.join(path, label, '*.*')):
-            texts.append(open(fname, 'r').read())
-            labels.append(idx)
-    return texts, np.array(labels).astype(np.int8)
+def get_text(directory, stemmer):
+    X = []
+    for filename in os.listdir(directory):
+        file = open(directory + '\\' + filename, "r", encoding="utf8")
+        for l in file:
+            X.append(stemmer.stem(l))
+    return X
 
-train, train_y = load_texts_labels_from_folders(f'{PATH}train',names)
-val, val_y = load_texts_labels_from_folders(f'{PATH}test',names)
+train_neg = get_text(".\\train\\neg", ps)
+train_pos = get_text(".\\train\\pos", ps)
+test_neg = get_text(".\\test\\neg", ps)
+test_pos = get_text(".\\test\\pos", ps)
 
+train = train_neg + train_pos
+test = test_neg + test_pos
 
-#len(train),len(train_y),len(val),len(val_y)
+train_y = [0 for i in range(len(train_neg))] + [1 for i in range(len(train_pos))]
+test_y = [0 for i in range(len(test_neg))] + [1 for i in range(len(test_pos))]
 
-#len(train_y[train_y==1]),len(val_y[val_y==1])
-
-#np.unique(train_y)
-
-#print(train[0])
-#print()
-#print(f"Review's label: {train_y[0]}")
-
-
-# Create same vocab for train and validation sets
-#train_term_doc = vectorizer.fit_transform(train)
-#val_term_doc = vectorizer.transform(val)
 
 max_thresh = 0.99
 min_thresh = 0
@@ -817,32 +808,31 @@ best_ngram(1, 2, vectorizer, cnb, train, train_y)
 vectorizer.set_params(ngram_range=(1, 1))
 test_tokenizer(token_list, token_names, vectorizer, cnb, train, train_y)
 vectorizer.set_params(tokenizer=None)
-test_counting(vectorizer, cnb, train, train_y)
+#test_counting(vectorizer, cnb, train, train_y)
 print(fit_min_threshold(0, 0.15, 10, vectorizer, cnb, train, train_y, 5))
 vectorizer.set_params(min_df=min_thresh)
 print(fit_max_threshold(0.5, 0.75, 20, vectorizer, cnb, train, train_y, 5))
 vectorizer.set_params(min_df=max_thresh)
 test_stopwords(sw_lst, sw_names, vectorizer, cnb, train, train_y.target, 5)
 
-"""
 X = get_vectors(vectorizer, train)
 Y = scipy.sparse.csr_matrix(train_y).transpose()
 dataset = scipy.sparse.hstack([X, Y], format="csr")
 dataset = sk.utils.shuffle(dataset)
 
-"""
+
 ### Find the hyperparameters of the classifier
 
 #print(fit_smoothing_nb(mnb, dataset, 20))
 
 #print(fit_smoothing_nb(cnb, dataset, 20))
 
-#print(fit_epsilon(1.e-4, 1.e-3, lr, dataset, 5))
-#fit_iter(300, 700, lr, dataset, 5)
+print(fit_epsilon(1.e-4, 1.e-3, lr, dataset, 5))
+fit_iter(300, 700, lr, dataset, 5)
 #print(fit_regu(0.1, 10, lr, dataset, 10))
 
-#print(fit_epsilon(1.e-4, 2.e-3, svm, dataset, 20))
-#fit_iter(800, 1500, svm, dataset, 8)
+print(fit_epsilon(1.e-4, 2.e-3, svm, dataset, 20))
+fit_iter(800, 1500, svm, dataset, 8)
 #print(fit_regu(0.1, 2, svm, dataset, 10))
 #compare_penalty_svm(svm, dataset)
 #compare_loss_svm(svm, dataset)
@@ -851,40 +841,50 @@ dataset = sk.utils.shuffle(dataset)
 #compare_splitter_tree(dtr, dataset)
 
 #compare_criterion_tree(rfc, dataset)
-#print(fit_number_random_forest(10, 50, ada, dataset, 5))
+print(fit_number_random_forest(10, 50, ada, dataset, 5))
 
-#print(fit_number_adaboost(10, 50, ada, dataset, 5))
-#print(fit_learning_adaboost(0.75, 1.25, ada, dataset, 5))
+print(fit_number_adaboost(10, 50, ada, dataset, 3))
+print(fit_learning_adaboost(0.75, 1.25, ada, dataset, 5))
 
 
-#print(compare_classifiers(clf_list, clf_names, dataset))
+print(compare_classifiers(clf_list, clf_names, dataset))
 
 ### Final test
-"""
-X_test = get_vectors(vectorizer, val, fit=False)
-Y_test = scipy.sparse.csr_matrix(val_y).transpose()
+
+mnb = nb.MultinomialNB(alpha=0.25)
+cnb = nb.ComplementNB(alpha=0.25)
+lr = sk.linear_model.LogisticRegression(solver='lbfgs', tol=1e-3, C=6.7, max_iter=300, multi_class='multinomial')
+svm = sk.svm.LinearSVC(tol=1e-3, C=0.3)
+dtr = sktree.DecisionTreeClassifier()
+rfc = skens.RandomForestClassifier(n_estimators=30)
+ada = skens.AdaBoostClassifier(n_estimators=30, learning_rate=1.25)
+
+X_test = get_vectors(vectorizer, test, fit=False)
+Y_test = scipy.sparse.csr_matrix(test_y).transpose()
 test_set = scipy.sparse.hstack([X_test, Y_test], format="csr")
 
-evaluate_model(cnb, dataset, test_set)
-"""
+#print(final_evaluation(clf_list, dataset, test_set))
+
+### Optimize the best classifier
+
+
+text_lr = Pipeline([('vect', vectorizer), ('tfidf', TfidfTransformer()), ('logistic', lr)])
+
+print(text_lr.get_params().keys())
+
+params = {'vect__ngram_range': [(1, 1), (2, 2)], 'vect__stop_words': ['english', stopwords.words('english')], 'vect__min_df': [0, 1e-4] ,'tfidf__use_idf': (True, False), 'logistic__tol': [1e-3, 1e-4], 'logistic__max_iter': [300, 500], 'logistic__C': [0.1, 1, 5, 10]}
+
+gs_lr = GridSearchCV(text_lr, params, cv=5, n_jobs=-1)
+gs_lr = gs_lr.fit(train, train_y)
+
+for param_name in sorted(params.keys()):
+    print("%s: %r" % (param_name, gs_lr.best_params_[param_name]))
+
+res = gs_lr.predict(test)
+mat = confusion_matrix(res, test_y, False)
+evaluate(mat, True)
 
 
 
 
 
-
-
-
-
-
-""" This concerns the dataset from my previous assignment, not relevant """
-
-
-"""
-#######################
-
-
-ps = PorterStemmer()
-
-pst = PunktSentenceTokenizer(raw_X)
-"""

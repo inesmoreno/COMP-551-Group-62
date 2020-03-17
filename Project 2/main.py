@@ -672,10 +672,8 @@ def naive_tokenizer(s):
 re_tok = re.compile(f'([{string.punctuation}“”¨«»®´·º½¾¿¡§£₤‘’])')
 def symbol_tokenize(s): return re_tok.sub(r' \1 ', s).split()
 
-pst = PunktSentenceTokenizer()
-
-token_list = [None, naive_tokenizer, symbol_tokenize, pst]
-token_names = ['Default', 'Naive', 'Symbol removal', 'PunktSentenceTokenizer']
+token_list = [None, naive_tokenizer, symbol_tokenize]
+token_names = ['Default', 'Naive', 'Symbol removal']
 
 sw_lst = [None, 'english', stopwords.words('english')]
 sw_names = ['None', 'Scikit.learn', 'NLTK']
@@ -807,8 +805,8 @@ vectorizer = sk.feature_extraction.text.CountVectorizer(min_df=min_thresh, max_d
 
 ### Choose the preprocessing parameters
 
-best_ngram(1, 2, vectorizer, cnb, train, train_y)
-vectorizer.set_params(ngram_range=(1, 1))
+#best_ngram(1, 2, vectorizer, cnb, train, train_y)
+#vectorizer.set_params(ngram_range=(1, 1))
 test_tokenizer(token_list, token_names, vectorizer, cnb, train, train_y)
 vectorizer.set_params(tokenizer=None)
 #test_counting(vectorizer, cnb, train, train_y)

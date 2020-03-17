@@ -63,6 +63,7 @@ def confusion_matrix(predicted, labels, sparse=True):
     else:
         correct = labels
     classes = np.unique(correct)        # List the different labels found in the testing set
+    print(classes)
     conf_mat = np.zeros((len(classes), len(classes)))       # Count the number of sample that was predicted to be labelled i with actual label j
     for i in range(len(predicted)):
         pred = np.argwhere(classes == predicted[i])[0]
@@ -141,6 +142,7 @@ def best_ngram(min_n, max_n, vectorizer, clf, raw_X, Y, k=5):
             ngram_lst.append('(' + str(i) + ', ' + str(j) + ')')
             X = get_vectors(vectorizer, raw_X)
             dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
+            dataset = sk.utils.shuffle(dataset)
             acc, ent = cross_validation(clf, dataset, k)
             acc_list.append(acc)
             ent_list.append(ent)
@@ -162,6 +164,7 @@ def test_tokenizer(token_list, names_list, vectorizer, clf, raw_X, Y, k=5):
         vectorizer.set_params(tokenizer=t)
         X = get_vectors(vectorizer, raw_X)
         dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
+        dataset = sk.utils.shuffle(dataset)
         acc, ent = cross_validation(clf, dataset, k)
         acc_list.append(acc)
         ent_list.append(ent)
@@ -669,10 +672,8 @@ def naive_tokenizer(s):
 re_tok = re.compile(f'([{string.punctuation}“”¨«»®´·º½¾¿¡§£₤‘’])')
 def symbol_tokenize(s): return re_tok.sub(r' \1 ', s).split()
 
-pst = PunktSentenceTokenizer()
-
-token_list = [None, naive_tokenizer, symbol_tokenize, pst]
-token_names = ['Default', 'Naive', 'Symbol removal', 'PunktSentenceTokenizer']
+token_list = [None, naive_tokenizer, symbol_tokenize]
+token_names = ['Default', 'Naive', 'Symbol removal']
 
 sw_lst = [None, 'english', stopwords.words('english')]
 sw_names = ['None', 'Scikit.learn', 'NLTK']
@@ -804,8 +805,8 @@ vectorizer = sk.feature_extraction.text.CountVectorizer(min_df=min_thresh, max_d
 
 ### Choose the preprocessing parameters
 
-best_ngram(1, 2, vectorizer, cnb, train, train_y)
-vectorizer.set_params(ngram_range=(1, 1))
+#best_ngram(1, 2, vectorizer, cnb, train, train_y)
+#vectorizer.set_params(ngram_range=(1, 1))
 test_tokenizer(token_list, token_names, vectorizer, cnb, train, train_y)
 vectorizer.set_params(tokenizer=None)
 #test_counting(vectorizer, cnb, train, train_y)

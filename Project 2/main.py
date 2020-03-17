@@ -63,6 +63,7 @@ def confusion_matrix(predicted, labels, sparse=True):
     else:
         correct = labels
     classes = np.unique(correct)        # List the different labels found in the testing set
+    print(classes)
     conf_mat = np.zeros((len(classes), len(classes)))       # Count the number of sample that was predicted to be labelled i with actual label j
     for i in range(len(predicted)):
         pred = np.argwhere(classes == predicted[i])[0]
@@ -141,6 +142,7 @@ def best_ngram(min_n, max_n, vectorizer, clf, raw_X, Y, k=5):
             ngram_lst.append('(' + str(i) + ', ' + str(j) + ')')
             X = get_vectors(vectorizer, raw_X)
             dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
+            dataset = sk.utils.shuffle(dataset)
             acc, ent = cross_validation(clf, dataset, k)
             acc_list.append(acc)
             ent_list.append(ent)
@@ -162,6 +164,7 @@ def test_tokenizer(token_list, names_list, vectorizer, clf, raw_X, Y, k=5):
         vectorizer.set_params(tokenizer=t)
         X = get_vectors(vectorizer, raw_X)
         dataset = scipy.sparse.hstack([X, sparse_Y], format="csr")
+        dataset = sk.utils.shuffle(dataset)
         acc, ent = cross_validation(clf, dataset, k)
         acc_list.append(acc)
         ent_list.append(ent)

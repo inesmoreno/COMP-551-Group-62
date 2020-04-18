@@ -33,8 +33,22 @@ def leaky_relu(x, gamma):
 def tanh(x):
     return 2*sigmoid(x) - 1
 
+
+def softmax(P):
+    n, = P.shape
+    print(n)
+    res = np.zeros((n,))
+    tot = 0
+    for i in range(n):
+        p = np.exp(P[i])
+        res[i] = p
+        tot += p
+    for i in range(n):
+        res[i] = res[i]/tot
+    return res
+
 class mlp():
-    def __init__(self, layers=[1024, 32, 32], input_size=3072, activation_function=sigmoid):
+    def __init__(self, layers=[1024, 32, 32], input_size=3072, classes=10, activation_function=sigmoid, alpha=0.01, eps=0.01):
         self.Z = []
         self.W = [np.ones((input_size+1, layers[0]))/input_size]
         
@@ -45,9 +59,13 @@ class mlp():
 
         self.Z.append(np.zeros((layers[-1]+1)))
         self.Z[-1][layers[-1]] = 1
-        self.W.append(np.ones((layers[-1]+1,))/layers[-1])
+        self.W.append(np.ones((layers[-1]+1, classes))/layers[-1])
+
+        self.Z.append(np.zeros((classes,)))
 
         self.activate = activation_function
+        self.lr = alpha
+        self.eps = eps
 
 
     def predict(self, input):
@@ -60,7 +78,7 @@ class mlp():
             for j in range(len(self.Z[i+1])-1):
                 self.Z[i+1][j] = self.activate(np.dot(self.Z[i], self.W[i+1][:, j]))
 
-        return self.activate(np.dot(self.Z[-1], self.W[-1]))
+        return softmax(self.Z[-1])
 
 
 perc = mlp()
@@ -81,9 +99,18 @@ def imshow(img):
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
     plt.show()
 
-print(trainset[0][0].size())
 
 test = []
+
+def add_sym(dataset):
+    res = []
+    for d in dataset:
+        res.append(d)
+        res.append((torch.flip(d[0], [2]), d[1]))
+    return res
+
+
+#foo = add_sym(trainset)
 
 
 for i in range(5):

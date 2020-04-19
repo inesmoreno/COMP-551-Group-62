@@ -59,7 +59,7 @@ images, labels = dataiter.next()
 #imshow(torchvision.utils.make_grid(images))
 #print(''.join('%5s'% classes[labels[j]] for j in range(4)))
 
- #Define the CNN
+# Define the CNN
 class Net(nn.Module):
     # Start by defining the layers
     def __init__(self):

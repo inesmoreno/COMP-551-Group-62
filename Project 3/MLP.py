@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import random
 import torch
 import torchvision
 import torchvision.transforms as transforms
@@ -7,22 +8,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-"""
-#x: N
-#y: N
-plt.plot(x, y, 'b.')
-phi = lambda x,mu,sigma: 1/(1 + np.exp(-(x - mu)/(2*sigma*sigma)))
-mu = np.linspace(0,3,10)
-Phi = phi(x[:,None], mu[None,:]) #N x 10
-w = np.linalg.lstsq(Phi, y)[0]
-yh = np.dot(Phi,w)
-plt.plot(x, yh, 'g-')
-"""
-
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
-
 
 def d_sigmoid(x):
     return x * (1 - x)
@@ -30,7 +18,6 @@ def d_sigmoid(x):
 
 def relu(x):
     return max(x, 0)
-
 
 def d_relu(x):
     if x <= 0:
@@ -42,14 +29,22 @@ def d_relu(x):
 def leaky_relu(x, gamma):
     return max(x, 0) + gamma * min(0, x)
 
+def d_leaky_relu(x, gamma):
+    if x <= 0:
+        return gamma
+    else:
+        return 1
+
 
 def tanh(x):
     return 2 * sigmoid(x) - 1
 
+def d_tanh(x):
+    return 1 - tanh(x)**2
+
 
 def softmax(P):
     n, = P.shape
-    print(n)
     res = np.zeros((n,))
     tot = 0
     for i in range(n):
@@ -62,55 +57,76 @@ def softmax(P):
 
 
 class mlp():
-    def __init__(self, layers=[1024, 32, 32], input_size=3072, classes=10, activation_function=sigmoid, alpha=0.01,
-                 eps=0.01):
-        self.Z = []
-        self.W = [np.ones((input_size + 1, layers[0])) / input_size]
+    def __init__(self, layers=[1024, 32, 32], input_size=3072, classes=10, activation_function=sigmoid, deriv=d_sigmoid,
+                 alpha=0.05, eps=0.25, batch_size=8):
+        self.Z = [np.zeros((input_size + 1,))]
+        self.W = [np.zeros((input_size + 1, layers[0]))]
 
         for i in range(len(layers) - 1):
-            self.Z.append(np.zeros((layers[i] + 1)))
+            self.Z.append(np.zeros((layers[i] + 1,)))
             self.Z[i][layers[i]] = 1
-            self.W.append(np.ones((layers[i] + 1, layers[i + 1])) / layers[i])
+            self.W.append(np.zeros((layers[i] + 1, layers[i + 1])))
 
-        self.Z.append(np.zeros((layers[-1] + 1)))
+        self.Z.append(np.zeros((layers[-1] + 1,)))
         self.Z[-1][layers[-1]] = 1
-        self.W.append(np.ones((layers[-1] + 1, classes)) / layers[-1])
+        self.W.append(np.zeros((layers[-1] + 1, classes)))
 
         self.Z.append(np.zeros((classes,)))
 
-        self.D = []
+        self.D = [np.zeros((input_size + 1, layers[0]))]
         for i in range(len(layers) - 1):
-            D = np.zeros((layers[i], layers[i + 1]))
+            D = np.zeros((layers[i] + 1, layers[i + 1]))
             self.D.append(D)
+        self.D.append(np.zeros((layers[-1] + 1, classes)))
 
         self.activate = activation_function
+        self.derivative = deriv
         self.lr = alpha
         self.eps = eps
+        self.batch_size = batch_size
         self.num_layers = len(layers)
 
+    def predict_proba(self, input):
+        s = input.size()
+        N = 1
+        for n in s:
+            N = N * n
+        x = torch.cat([input.reshape(N), torch.tensor([1.0])])
+
+        self.Z[0] = np.array(x)
+
+        for i in range(len(self.Z)-2):
+            for j in range(len(self.Z[i+1])-1):
+                self.Z[i+1][j] = self.activate(np.dot(self.Z[i], self.W[i][:, j]))
+
+        A = np.zeros((len(self.Z[-1])))
+        for j in range(len(A)):
+            A[j] = np.dot(self.Z[-2], self.W[-1][:, j])
+
+        self.Z[-1] = softmax(A)
+
+        return self.Z[-1]
+
     def predict(self, input):
-        x = torch.cat([input, torch.tensor([1.0])])
+        yh = self.predict_proba(input)
+        return np.argmax(yh)
 
-        for j in range(len(self.Z[0]) - 1):
-            self.Z[0][j] = self.activate(np.dot(x, self.W[0][:, j]))
-
-        for i in range(len(self.Z) - 1):
-            for j in range(len(self.Z[i + 1]) - 1):
-                self.Z[i + 1][j] = self.activate(np.dot(self.Z[i], self.W[i + 1][:, j]))
-
-        return softmax(self.Z[-1])
-
-    def backprop(self, error):
+    def backprop(self, yh, label):
         ## need the derivation of activation functions
-        for i in reversed(range(len(self.D))):
-            delta = error * d_sigmoid(
-                self.Z[i + 1])  # sigmoid derivative for precedent (change with respect to activation function)
-            t_delta = np.reshape(delta.shape[0], -1).T
+        error = yh
+        error[label] += -1
+        delta = np.copy(error)
 
-            active = self.Z[i]
-            active = np.reshape(active.shape[0], -1)
-            self.D[i] = np.dot(active, delta)
-            error = np.dot(delta, self.W[i].T)
+        self.D[-1] = np.outer(delta.T, self.Z[-2]).T
+
+
+        for i in reversed(range(len(self.D)-1)):
+            error = np.dot(delta, self.W[i+1].T)
+            delta = np.delete(error, len(error)-1)
+            for j in range(len(delta)-1):
+                delta[j] = delta[j] * self.derivative(np.dot(self.Z[i], self.W[i][:, j]))  # sigmoid derivative for precedent (change with respect to activation function)
+            self.D[i] = np.outer(delta.T, self.Z[i]).T
+
 
     def cross_entropy(self, out, label):
         N = label.shape[0]  # sanity check for num of classes, should be 10
@@ -126,23 +142,80 @@ class mlp():
         delta = grad / N
         return delta
 
-    def stochastic_gradient_descent(self, X):
-        """Taken from slides 6.4 gradient descent
-        # update the weights by stepping down the gradient
-        N, D = X.shape
-        w = np.zeros(D)
+    def batch_stochastic_gradient_descent(self, X):
+        N = len(X)
         g = np.inf
-        while np.linalg.norm(g) > self.eps:
-            n = np.random.randint(N)
-            g = gradient(X[[n],:],y[[n]],w)
-            w = w - self.lr*g
-        return w """
 
-        for i in range(len(self.W)):
-            self.W = self.W[i]
-            derivatives = self.D[i]
-            self.W += derivatives * self.lr
+        while g > self.eps:
+            grad = []
+            for l in range(len(self.D)):
+                s = self.D[l].shape
+                grad.append(np.zeros(s))
 
+            batch = random.sample(range(N), self.batch_size)
+            for i in batch:
+                yh = self.predict_proba(X[i][0])
+                
+                self.backprop(yh, X[i][1])
+                for l in range(len(self.D)):
+                    grad[l] += self.D[l]
+            
+            g = 0
+            for l in range(len(self.D)):
+                grad[l] = grad[l] / self.batch_size
+                g += np.linalg.norm(grad[l])
+                self.W[l] += -grad[l] * self.lr
+            print("g : ", g)
+
+    def fit(self, trainset):
+        self.batch_stochastic_gradient_descent(trainset)
+
+
+
+
+def get_sym(img):
+    return torch.flip(img, [2])
+
+def add_noise(img, noise=0.1):
+    s = img.size()
+    return img + 2*noise*(torch.rand(s) - 0.5)
+
+def get_transpose(img):
+    return torch.transpose(img, 1, 2)
+
+def add_data(dataset, sym=True, transpose=True, noise=0.1, noise_iter=1):
+    res = []
+    for d in dataset:
+        res.append(d)
+        if sym:
+            d_sym = get_sym(d[0])
+            res.append((d_sym, d[1]))
+            if transpose:
+                d_st = get_transpose(d_sym)
+                res.append((d_st, d[1]))
+                if noise > 0:
+                    for i in range(noise_iter):
+                        res.append((add_noise(d_st, noise), d[1]))
+
+        if transpose:
+            d_t = get_transpose(d[0])
+            res.append((d_t, d[1]))
+            if noise > 0:
+                for i in range(noise_iter):
+                    res.append((add_noise(d_t, noise), d[1]))
+
+        if noise > 0:
+            for i in range(noise_iter):
+                res.append((add_noise(d[0], noise), d[1]))
+
+    return res
+
+
+def imshow(img):
+    img = img / 2 + 0.5     # unnormalize
+    npimg = img.numpy()
+    plt.imshow(np.transpose(npimg, (1, 2, 0)))
+    plt.show()
 
 #doef train():
 
@@ -164,5 +237,12 @@ if __name__ == "__main__":
 
     classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
+    aug_train = add_data(trainset, False, False, 0)
+
+
+    perc.fit(aug_train)
+
+"""
 if __name__ == '__main__':
     main()
+"""

@@ -129,7 +129,8 @@ def add_noise(dataset, noise=0.1):
 for i in range(5):
     test.append(trainset[i][0])
     s = trainset[i][0].size()
-    test.append(trainset[i][0] + 2*0.1*(torch.rand(s) - 0.5))
+    test.append(torch.transpose(trainset[i][0], 1, 2))
+    #test.append(trainset[i][0] + 2*0.1*(torch.rand(s) - 0.5))
     #test.append(torch.flip(trainset[i][0], [2]))
 
     #x = trainset[i][0].reshape(3072)

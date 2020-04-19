@@ -36,7 +36,6 @@ def tanh(x):
 
 def softmax(P):
     n, = P.shape
-    print(n)
     res = np.zeros((n,))
     tot = 0
     for i in range(n):
@@ -48,7 +47,8 @@ def softmax(P):
     return res
 
 class mlp():
-    def __init__(self, layers=[1024, 32, 32], input_size=3072, classes=10, activation_function=sigmoid, alpha=0.01, eps=0.01):
+    def __init__(self, layers=[1024, 32, 32], input_size=3072, classes=10, activation_function=sigmoid,
+                alpha=0.01, eps=0.01, batch_size=10):
         self.Z = []
         self.W = [np.ones((input_size+1, layers[0]))/input_size]
         
@@ -68,7 +68,7 @@ class mlp():
         self.eps = eps
 
 
-    def predict(self, input):
+    def predict_proba(self, input):
         x = torch.cat([input, torch.tensor([1.0])])
 
         for j in range(len(self.Z[0])-1):
@@ -79,6 +79,11 @@ class mlp():
                 self.Z[i+1][j] = self.activate(np.dot(self.Z[i], self.W[i+1][:, j]))
 
         return softmax(self.Z[-1])
+
+    def predict(self, input):
+        yh = self.predict_proba(input)
+        print(yh)
+        return np.argmax(yh)
 
 
 perc = mlp()
@@ -110,23 +115,34 @@ def add_sym(dataset):
     return res
 
 
+def add_noise(dataset, noise=0.1):
+    res = []
+    for d in dataset:
+        res.append(d)
+        s = d[0].size
+        res.append((d[0] + 2*noise*(torch.rand(s) - 0.5), d[1]))
+    return res
+
 #foo = add_sym(trainset)
 
 
 for i in range(5):
     test.append(trainset[i][0])
-    test.append(torch.flip(trainset[i][0], [2]))
+    s = trainset[i][0].size()
+    test.append(trainset[i][0] + 2*0.1*(torch.rand(s) - 0.5))
+    #test.append(torch.flip(trainset[i][0], [2]))
 
     #x = trainset[i][0].reshape(3072)
     #print(x)
-    print(perc.predict(trainset[i][0].reshape(3072)))
+    #print(perc.predict(trainset[i][0].reshape(3072)))
     #print(np.dot(trainset[i][0].reshape(3072), np.ones((3072, ))))
     #print(activate(trainset[i][0].reshape(3072), np.ones((3072, ))/3072))
 
-"""
+
 for im in test:
+    print(im)
     imshow(im)
-"""
+
 
 """
 # get some random training images

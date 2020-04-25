@@ -224,7 +224,7 @@ def compare_optimizer(cnn, opti=[optim.Adam, optim.SGD]):
             plt.show()
             acc_list = []  # Restart the list to plot the second optimizer
         else:
-            for l in lr_list:
+            for l in lr_list: # Loop to find highest accuracy
                 train(net, o, l, 5)
                 acc = test_classes()
                 if acc > best_acc:
@@ -242,7 +242,7 @@ def compare_optimizer(cnn, opti=[optim.Adam, optim.SGD]):
 def compare_epochs(net):
     acc_list = []  # List storing results
     best_acc = 0
-    for e in range(2, 11):
+    for e in range(2, 11): # Loop to find highest accuracy
         train(net, optimizer=optim.Adam, lr=0.0015, epochs=e)
         acc = test_classes()
         if acc > best_acc:
@@ -260,7 +260,7 @@ def compare_layer_filters():
     num_filter = [8, 16, 32, 64]
     acc_list = []  # List storing results
     best_acc = 0
-    for i in range(3):
+    for i in range(3): # Loop to find highest accuracy
         net = Net(num_filters1=num_filter[i], num_filters2=num_filter[i+1], kernel_size=5, activation=F.relu)
         train(net, optimizer=optim.Adam, lr=0.0015, epochs=5)
         acc = test_classes()
